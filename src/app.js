@@ -13,12 +13,14 @@ const app = express();
 const server = http.createServer(app);
 
 // ============================================================
-// 1. CONFIGURAÇÃO DO SOCKET.IO
+// 1. CONFIGURAÇÃO DO SOCKET.IO (CORS LIBERADO)
 // ============================================================
 const io = socketIo(server, {
   cors: {
-    origin: "*", // Em produção, mude para o domínio do seu frontend (ex: https://app.ordengo.com)
-    methods: ["GET", "POST"]
+    origin: "*", // Libera acesso de qualquer frontend (localhost, vercel, etc)
+    methods: ["GET", "POST"],
+    allowedHeaders: ["my-custom-header"],
+    credentials: true
   }
 });
 
@@ -34,19 +36,14 @@ io.on('connection', (socket) => {
   console.log(`🔌 Socket conectado: ${socket.id}`);
 
   // Evento para entrar em uma sala (Room)
-  // O Frontend deve emitir 'join_room' logo após conectar
   socket.on('join_room', (data) => {
     // data esperada: { restaurantId, type, tableId }
-    // type: 'waiter' | 'kitchen' | 'table'
-
     if (data.type === 'waiter' || data.type === 'kitchen') {
-      // Garçons e Cozinha ouvem tudo do restaurante
       const room = `restaurant_${data.restaurantId}`;
       socket.join(room);
       console.log(`👨‍🍳 Socket ${socket.id} entrou na sala: ${room}`);
     } 
     else if (data.type === 'table') {
-      // Tablet da mesa ouve apenas coisas daquela mesa
       const room = `table_${data.tableId}`;
       socket.join(room);
       console.log(`📱 Socket ${socket.id} entrou na sala: ${room}`);
@@ -62,7 +59,7 @@ io.on('connection', (socket) => {
 // 2. MIDDLEWARES GLOBAIS
 // ============================================================
 
-// CORS - Permitir acesso do Frontend
+// CORS - Permitir acesso total HTTP
 app.use(cors());
 
 // Body Parser - Ler JSON e FormUrlEncoded
@@ -81,7 +78,9 @@ app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 app.use('/api/v1', routes);
 
 // Tratamento para rotas não encontradas (404)
-app.all('*', (req, res, next) => {
+// CORREÇÃO APLICADA: Usando Regex /(.*)/ em vez de string '*'
+// Isso resolve o erro "Missing parameter name at index 1"
+app.all(/(.*)/, (req, res, next) => {
   next(new AppError(`Não foi possível encontrar ${req.originalUrl} neste servidor!`, 404));
 });
 
@@ -94,13 +93,13 @@ app.use(globalErrorHandler);
 const PORT = process.env.PORT || 3000;
 
 // Sincroniza o banco de dados e inicia o servidor
-// { alter: true } atualiza tabelas se mudar models (bom para dev, cuidado em prod)
+// { alter: true } tenta ajustar as tabelas sem apagar dados.
 sequelize.sync({ alter: true }) 
   .then(() => {
     console.log('💾 Banco de dados conectado e sincronizado.');
     server.listen(PORT, () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
-      console.log(`📡 Socket.io pronto para conexões.`);
+      console.log(`📡 Socket.io pronto (CORS: *)`);
     });
   })
   .catch(err => {
