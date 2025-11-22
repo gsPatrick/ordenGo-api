@@ -9,14 +9,29 @@ const AppError = require('../../utils/AppError');
 
 /**
  * Abre uma nova sessão (Mesa Ocupada)
- * Define o nome do cliente automaticamente como "Mesa X"
+ * CORREÇÃO: Aceita tableId numérico (1) ou UUID, e salva o UUID correto na sessão.
  */
-exports.startSession = async (restaurantId, tableId) => {
-  const table = await Table.findOne({ where: { id: tableId, restaurantId } });
+exports.startSession = async (restaurantId, tableIdInput) => {
+  // 1. Tenta encontrar a mesa (aceita tanto ID 1 quanto UUID)
+  let table;
+  
+  // Verifica se é um número inteiro (ID sequencial) ou string numérica
+  // UUIDs contêm hífens e letras, IDs numéricos não.
+  if (!isNaN(tableIdInput) && !String(tableIdInput).includes('-')) {
+    table = await Table.findOne({ where: { id: tableIdInput, restaurantId } });
+  } else {
+    // Se for string complexa (UUID), busca pelo UUID
+    table = await Table.findOne({ 
+      where: { 
+        restaurantId,
+        uuid: tableIdInput
+      } 
+    });
+  }
   
   if (!table) throw new AppError('Mesa não encontrada', 404);
 
-  // Se já tem sessão aberta, retorna ela (evita duplicação)
+  // Se já tem sessão aberta, retorna ela para evitar duplicação
   if (table.status !== 'free' && table.currentSessionId) {
     return await TableSession.findByPk(table.currentSessionId);
   }
@@ -26,14 +41,15 @@ exports.startSession = async (restaurantId, tableId) => {
     // Cria a sessão
     const session = await TableSession.create({
       restaurantId,
-      tableId,
-      // MUDANÇA: Fixado como o nome/número da mesa (ex: "Mesa 10")
+      // CRÍTICO: Salvamos o UUID da mesa na sessão (pois a coluna é type: UUID), 
+      // mesmo que a entrada tenha sido o ID numérico 1.
+      tableId: table.uuid, 
       clientName: `Mesa ${table.number}`, 
       status: 'open',
       openedAt: new Date()
     }, { transaction });
 
-    // Atualiza a mesa para Ocupada + Incrementa contador de sessões (Telemetria)
+    // Atualiza a mesa
     table.status = 'occupied';
     table.currentSessionId = session.id;
     table.lifetimeSessionCount = (table.lifetimeSessionCount || 0) + 1;
@@ -49,33 +65,31 @@ exports.startSession = async (restaurantId, tableId) => {
 };
 
 /**
- * Fecha a sessão (Conta paga) e calcula tempo de uso
+ * Fecha a sessão (Conta paga)
  */
 exports.closeSession = async (restaurantId, sessionId, paymentMethod) => {
   const session = await TableSession.findOne({ where: { id: sessionId, restaurantId } });
   if (!session) throw new AppError('Sessão não encontrada', 404);
   
-  const table = await Table.findByPk(session.tableId);
+  // Busca a mesa usando o UUID salvo na sessão
+  const table = await Table.findOne({ where: { uuid: session.tableId } });
 
   const transaction = await sequelize.transaction();
   try {
-    // Fecha a sessão
     session.status = 'closed';
     session.closedAt = new Date();
     session.paymentMethod = paymentMethod;
     await session.save({ transaction });
 
-    // Libera a mesa e calcula tempo de ocupação (Telemetria)
     if (table) {
       table.status = 'free';
       table.currentSessionId = null;
       
-      // Cálculo de tempo decorrido em segundos
+      // Cálculo de tempo decorrido em segundos (Telemetria)
       const startTime = new Date(session.openedAt).getTime();
       const endTime = new Date(session.closedAt).getTime();
       const durationSeconds = Math.floor((endTime - startTime) / 1000);
 
-      // Soma ao acumulador vitalício da mesa
       table.lifetimeOccupiedSeconds = (Number(table.lifetimeOccupiedSeconds) || 0) + durationSeconds;
 
       await table.save({ transaction });
@@ -93,12 +107,8 @@ exports.closeSession = async (restaurantId, sessionId, paymentMethod) => {
 // PEDIDOS
 // ============================================================
 
-/**
- * Cria um pedido novo (Envia para cozinha)
- * Calcula preços no backend para segurança
- */
 exports.createOrder = async (restaurantId, data) => {
-  const { tableSessionId, waiterId, items, notes } = data; // items = [{ productId, quantity, modifiers... }]
+  const { tableSessionId, waiterId, items, notes } = data;
 
   const session = await TableSession.findByPk(tableSessionId);
   if (!session || session.status === 'closed') {
@@ -107,7 +117,6 @@ exports.createOrder = async (restaurantId, data) => {
 
   const transaction = await sequelize.transaction();
   try {
-    // 1. Calcular totais validando preços no Banco de Dados
     let orderTotal = 0;
     const orderItemsData = [];
 
@@ -117,7 +126,7 @@ exports.createOrder = async (restaurantId, data) => {
 
       let unitPrice = Number(product.price);
 
-      // Se tiver variante (Tamanho), pega o preço dela
+      // Se tiver variante (Tamanho), usa o preço da variante
       if (item.productVariantId) {
         const variant = await ProductVariant.findByPk(item.productVariantId);
         if (variant) unitPrice = Number(variant.price);
@@ -140,32 +149,29 @@ exports.createOrder = async (restaurantId, data) => {
         quantity: item.quantity,
         unitPrice: finalUnitPrice,
         totalPrice: itemTotal,
-        modifiers: item.modifiers, // Salva snapshot JSON
+        modifiers: item.modifiers, // Snapshot JSON
         observation: item.observation
       });
     }
 
-    // 2. Criar o Order
     const order = await Order.create({
       restaurantId,
       tableSessionId,
       waiterId: waiterId || null,
-      status: 'pending', // Cozinha recebe como Pendente
+      status: 'pending',
       total: orderTotal,
       notes
     }, { transaction });
 
-    // 3. Criar os Itens
     const itemsWithOrderId = orderItemsData.map(i => ({ ...i, orderId: order.id }));
     await OrderItem.bulkCreate(itemsWithOrderId, { transaction });
 
-    // 4. Atualizar o Total da Sessão
+    // Atualiza total da sessão
     session.totalAmount = Number(session.totalAmount) + orderTotal;
     await session.save({ transaction });
 
     await transaction.commit();
 
-    // Retornar pedido completo (com itens e detalhes)
     const fullOrder = await Order.findByPk(order.id, {
       include: [
         { model: OrderItem, as: 'items', include: [{ model: Product, attributes: ['name'] }] },
@@ -181,13 +187,10 @@ exports.createOrder = async (restaurantId, data) => {
   }
 };
 
-/**
- * Atualiza status (Aceitar, Pronto, Entregue)
- */
 exports.updateOrderStatus = async (restaurantId, orderId, status) => {
   const order = await Order.findOne({ 
     where: { id: orderId, restaurantId },
-    include: [{ model: TableSession }] // Necessário para saber a Mesa ID para o socket
+    include: [{ model: TableSession }]
   });
   
   if (!order) throw new AppError('Pedido não encontrado', 404);
@@ -198,9 +201,6 @@ exports.updateOrderStatus = async (restaurantId, orderId, status) => {
   return order;
 };
 
-/**
- * Lista pedidos de uma sessão (Histórico da mesa)
- */
 exports.getSessionOrders = async (sessionId) => {
   return await Order.findAll({
     where: { tableSessionId: sessionId },
@@ -209,22 +209,19 @@ exports.getSessionOrders = async (sessionId) => {
   });
 };
 
-/**
- * Lista pedidos ativos do Restaurante (Para o Painel do Garçom/Cozinha)
- */
 exports.getActiveOrders = async (restaurantId) => {
   return await Order.findAll({
     where: { 
       restaurantId,
-      status: ['pending', 'accepted', 'preparing', 'ready'] // Não traz entregues/cancelados
+      status: ['pending', 'accepted', 'preparing', 'ready']
     },
     include: [
       { 
         model: TableSession, 
-        include: [{ model: Table }] // Para mostrar "Mesa 01"
+        include: [{ model: Table }] 
       },
       { model: OrderItem, as: 'items', include: [Product] }
     ],
-    order: [['createdAt', 'ASC']] // FIFO (First In, First Out)
+    order: [['createdAt', 'ASC']]
   });
 };
