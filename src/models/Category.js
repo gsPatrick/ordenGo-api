@@ -11,17 +11,23 @@ const Category = sequelize.define('Category', {
     type: DataTypes.UUID,
     allowNull: false,
   },
-  parentId: { // Se null, é categoria principal. Se preenchido, é subcategoria.
+  parentId: {
     type: DataTypes.UUID,
     allowNull: true,
   },
+  // i18n
   name: {
     type: DataTypes.JSONB, // { pt: "Bebidas", en: "Drinks" }
     allowNull: false,
   },
-  image: {
+  image: { // Ícone/Thumb da categoria
     type: DataTypes.STRING,
     allowNull: true,
+  },
+  // Novo: Banners promocionais específicos desta categoria
+  banners: {
+    type: DataTypes.JSONB, // Array ["/uploads/promo-beer.jpg"]
+    defaultValue: [],
   },
   order: {
     type: DataTypes.INTEGER,

@@ -19,6 +19,11 @@ const Notification = sequelize.define('Notification', {
     type: DataTypes.ENUM('CALL_WAITER', 'REQUEST_BILL'),
     allowNull: false,
   },
+  // NOVO CAMPO: Método de pagamento (ex: 'credit', 'debit', 'pix', 'cash')
+  paymentMethod: {
+    type: DataTypes.STRING,
+    allowNull: true, 
+  },
   status: {
     type: DataTypes.ENUM('pending', 'resolved'),
     defaultValue: 'pending',

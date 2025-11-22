@@ -3,6 +3,12 @@ const menuController = require('./menu.controller');
 const { protect, restrictTo } = require('../../middlewares/authMiddleware');
 const upload = require('../../utils/upload');
 
+const categoryUpload = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'banners', maxCount: 5 }
+]);
+
+
 const router = express.Router();
 
 // ============================================================
@@ -31,14 +37,16 @@ router.get('/modifiers', restrictTo('manager', 'admin', 'waiter'), menuControlle
 router.use(restrictTo('manager', 'admin'));
 
 // Categorias
-router.post('/categories', upload.single('image'), menuController.createCategory);
-router.patch('/categories/:id', upload.single('image'), menuController.updateCategory);
-
+router.post('/categories', categoryUpload, menuController.createCategory);
+router.patch('/categories/:id', categoryUpload, menuController.updateCategory);
 // Produtos
 router.post('/products', upload.single('image'), menuController.createProduct);
 router.patch('/products/:id/availability', menuController.toggleAvailability); // "86 it" rápido
 
 // Modificadores (Escrita)
 router.post('/modifiers', menuController.createModifierGroup);
+
+router.get('/products', restrictTo('manager', 'admin', 'waiter'), menuController.listProducts);
+
 
 module.exports = router;

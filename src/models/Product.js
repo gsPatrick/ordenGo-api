@@ -15,14 +15,15 @@ const Product = sequelize.define('Product', {
     type: DataTypes.UUID,
     allowNull: false,
   },
+  // i18n
   name: {
-    type: DataTypes.JSONB, 
+    type: DataTypes.JSONB, // { pt: "X-Bacon", en: "Bacon Burger" }
     allowNull: false,
   },
   description: {
     type: DataTypes.JSONB,
   },
-  price: { // Preço base. Se tiver variantes, este pode ser 0 ou o preço da menor variante.
+  price: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
     defaultValue: 0.00,
@@ -30,14 +31,24 @@ const Product = sequelize.define('Product', {
   imageUrl: {
     type: DataTypes.STRING,
   },
-  isAvailable: { // O famoso "86" (acabou no estoque)
+  // Flags de Marketing
+  isOffer: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  isHighlight: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  // Controle
+  isAvailable: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
   details: {
-    type: DataTypes.JSONB, // { calories: 300, allergens: ["gluten"], prepTime: "15min" }
+    type: DataTypes.JSONB, // { calories: 300, allergens: ["gluten"] }
   },
-  hasVariants: { // Flag para facilitar o frontend saber se abre modal de opções
+  hasVariants: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   }

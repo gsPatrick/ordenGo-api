@@ -16,40 +16,58 @@ const RestaurantConfig = sequelize.define('RestaurantConfig', {
     type: DataTypes.STRING,
     allowNull: true,
   },
-  primaryColor: { // Cor dos botões principais
-    type: DataTypes.STRING(7), // Hex code #FF0000
+  primaryColor: {
+    type: DataTypes.STRING(7),
     defaultValue: '#df0024',
   },
-  secondaryColor: { // Detalhes
+  secondaryColor: {
     type: DataTypes.STRING(7),
     defaultValue: '#1f1c1d',
   },
-  backgroundColor: { // Tema Dark ou Light
+  backgroundColor: {
     type: DataTypes.STRING(7),
     defaultValue: '#1f1c1d', 
   },
-  // Conteúdo "Sobre"
+  
+  // --- CONTEÚDO INSTITUCIONAL (i18n) ---
+  
+  // Nome de exibição comercial (ex: "A Casa da Picanha")
+  publicTitle: {
+    type: DataTypes.JSONB, // Ex: { pt: "Casa da Picanha", en: "Steak House" }
+  },
+  // Título curto da seção Sobre
   aboutTitle: {
-    type: DataTypes.JSONB, // { pt: "Sobre Nós", en: "About Us" }
+    type: DataTypes.JSONB,
   },
+  // Texto curto
   aboutText: {
-    type: DataTypes.JSONB, // Texto rico
+    type: DataTypes.JSONB,
   },
-  wifiSsid: {
-    type: DataTypes.STRING,
+  // História completa (Novo)
+  ourHistory: {
+    type: DataTypes.JSONB, // Texto longo
   },
-  wifiPassword: {
-    type: DataTypes.STRING,
+
+  // --- IMAGENS INSTITUCIONAIS (Arrays de URLs) ---
+  
+  institutionalBanners: {
+    type: DataTypes.JSONB, // Array de Strings: ["/uploads/a.jpg", "/uploads/b.jpg"]
+    defaultValue: [],
   },
+  highlightImagesLarge: {
+    type: DataTypes.JSONB,
+    defaultValue: [],
+  },
+  highlightImagesSmall: {
+    type: DataTypes.JSONB, // Deve conter idealmente 2 imagens
+    defaultValue: [],
+  },
+
   // Funcionalidades
-  enableCallWaiter: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true,
-  },
-  enableBillRequest: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true,
-  }
+  wifiSsid: { type: DataTypes.STRING },
+  wifiPassword: { type: DataTypes.STRING },
+  enableCallWaiter: { type: DataTypes.BOOLEAN, defaultValue: true },
+  enableBillRequest: { type: DataTypes.BOOLEAN, defaultValue: true }
 });
 
 module.exports = RestaurantConfig;

@@ -3,6 +3,21 @@ const {
 } = require('../../models');
 const AppError = require('../../utils/AppError');
 
+
+
+exports.getProducts = async (restaurantId, filters = {}) => {
+  const where = { restaurantId, isAvailable: true };
+
+  if (filters.isOffer) where.isOffer = true;
+  if (filters.isHighlight) where.isHighlight = true;
+
+  return await Product.findAll({
+    where,
+    include: [{ model: Category, attributes: ['name'] }]
+  });
+};
+
+
 // ==============================================================================
 // 1. LEITURA (PUBLIC & ADMIN)
 // ==============================================================================

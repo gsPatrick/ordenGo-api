@@ -14,7 +14,34 @@ exports.getSettings = catchAsync(async (req, res, next) => {
 
 // PATCH /settings/appearance (Cores, Wifi, Sobre)
 exports.updateAppearance = catchAsync(async (req, res, next) => {
-  const config = await restaurantService.updateConfig(req.restaurantId, req.body);
+  const data = { ...req.body };
+
+  // Processar Uploads Múltiplos
+  // req.files vem do 'upload.fields([...])' configurado na rota
+  if (req.files) {
+    // Função auxiliar para mapear arquivos para URLs
+    const mapFiles = (files) => files.map(f => `/uploads/${f.filename}`);
+
+    if (req.files.institutionalBanners) {
+      data.institutionalBanners = mapFiles(req.files.institutionalBanners);
+    }
+    if (req.files.highlightImagesLarge) {
+      data.highlightImagesLarge = mapFiles(req.files.highlightImagesLarge);
+    }
+    if (req.files.highlightImagesSmall) {
+      data.highlightImagesSmall = mapFiles(req.files.highlightImagesSmall);
+    }
+  }
+
+  // Parse de JSONs vindos do FormData (Se o frontend enviar stringificado)
+  // Ex: '{"pt": "Olá"}' vira objeto
+  ['publicTitle', 'aboutTitle', 'aboutText', 'ourHistory'].forEach(field => {
+    if (data[field] && typeof data[field] === 'string') {
+      try { data[field] = JSON.parse(data[field]); } catch(e) {}
+    }
+  });
+
+  const config = await restaurantService.updateConfig(req.restaurantId, data);
 
   res.status(200).json({
     status: 'success',

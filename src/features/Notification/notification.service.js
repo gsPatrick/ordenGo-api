@@ -5,7 +5,6 @@ const AppError = require('../../utils/AppError');
 // ============================================================
 // CONFIGURAÇÃO DO WEB PUSH
 // ============================================================
-// Configura apenas se as chaves estiverem presentes no .env
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
     process.env.VAPID_EMAIL || 'mailto:admin@ordengo.com',
@@ -20,7 +19,6 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 
 /**
  * Salva a inscrição do navegador do garçom no banco de dados.
- * Isso permite que ele receba notificações mesmo com o celular bloqueado.
  */
 exports.subscribeToPush = async (restaurantId, userId, subscription) => {
   // Verifica se já existe esse endpoint para evitar duplicação
@@ -46,14 +44,14 @@ exports.subscribeToPush = async (restaurantId, userId, subscription) => {
 };
 
 /**
- * Função interna para disparar notificação para TODOS os garçons do restaurante.
+ * Dispara notificação para TODOS os garçons do restaurante.
  */
 const sendPushToRestaurantTeam = async (restaurantId, payload) => {
   try {
     // 1. Busca todas as inscrições válidas deste restaurante
     const subscriptions = await PushSubscription.findAll({ where: { restaurantId } });
     
-    if (subscriptions.length === 0) return; // Ninguém inscrito
+    if (subscriptions.length === 0) return;
 
     const payloadString = JSON.stringify(payload);
 
@@ -66,10 +64,10 @@ const sendPushToRestaurantTeam = async (restaurantId, payload) => {
 
       return webpush.sendNotification(pushConfig, payloadString)
         .catch(async (err) => {
-          // Se der erro 410 (Gone) ou 404, significa que o usuário limpou cookies ou desinstalou
+          // Erro 410 ou 404 significa que a inscrição expirou ou usuário removeu permissão
           if (err.statusCode === 410 || err.statusCode === 404) {
-            console.log(`🗑️ Removendo subscrição inválida/expirada: ${sub.id}`);
-            await sub.destroy(); // Limpa do banco para não tentar enviar de novo
+            console.log(`🗑️ Removendo subscrição inválida: ${sub.id}`);
+            await sub.destroy(); 
           } else {
             console.error('Erro ao enviar push:', err);
           }
@@ -89,15 +87,13 @@ const sendPushToRestaurantTeam = async (restaurantId, payload) => {
 
 /**
  * Cria uma nova notificação (Chamado da Mesa).
- * Resolve automaticamente o problema de ID Numérico vs UUID.
+ * Suporta método de pagamento e resolução de ID/UUID.
  */
 exports.createNotification = async (restaurantId, data) => {
-  const { tableId: tableIdInput, type } = data; // type: 'CALL_WAITER' | 'REQUEST_BILL'
+  const { tableId: tableIdInput, type, paymentMethod } = data; 
 
-  // 1. BUSCAR A MESA CORRETA (Correção do erro "operator does not exist: uuid = integer")
-  // O frontend pode mandar "1" (number) ou "uuid-string". O banco precisa do UUID.
+  // 1. BUSCAR A MESA CORRETA (Resolve erro UUID vs Integer)
   let table;
-  
   if (!isNaN(tableIdInput) && !String(tableIdInput).includes('-')) {
     // Se for número (1), busca pelo ID inteiro
     table = await Table.findOne({ where: { id: tableIdInput, restaurantId } });
@@ -110,7 +106,7 @@ exports.createNotification = async (restaurantId, data) => {
     throw new AppError('Mesa não encontrada para enviar notificação.', 404);
   }
 
-  const realTableUUID = table.uuid; // O UUID real que o banco espera
+  const realTableUUID = table.uuid;
 
   // 2. DESDUPLICAÇÃO: Verificar se já existe um chamado pendente igual
   const existingNotification = await Notification.findOne({
@@ -123,7 +119,6 @@ exports.createNotification = async (restaurantId, data) => {
   });
 
   if (existingNotification) {
-    // Se já existe, retorna ela sem criar spam no banco
     return existingNotification;
   }
 
@@ -132,38 +127,57 @@ exports.createNotification = async (restaurantId, data) => {
     restaurantId,
     tableId: realTableUUID,
     type,
+    paymentMethod: paymentMethod || null, // Salva ex: 'pix', 'credit'
     status: 'pending'
   });
 
-  // 4. Busca infos completas para retorno (incluindo o número da mesa para exibir)
+  // 4. Busca infos completas para retorno
   const fullNotification = await Notification.findByPk(notification.id, {
     include: [{ model: Table, attributes: ['number'] }]
   });
 
   // 5. ATUALIZAR STATUS VISUAL DA MESA
   if (type === 'REQUEST_BILL') {
-    table.status = 'closing'; // Muda cor para Vermelho/Fechamento
+    table.status = 'closing'; // Vermelho/Fechamento
     await table.save();
   } else if (type === 'CALL_WAITER') {
-    // Apenas muda para chamando se estiver ocupada (para não bugar mesa livre)
     if (table.status === 'occupied') {
-      table.status = 'calling'; // Muda cor para Amarelo/Chamando
+      table.status = 'calling'; // Amarelo/Chamando
       await table.save();
     }
   }
 
-  // 6. DISPARAR O PUSH NOTIFICATION (FIRE & FORGET)
-  // Não usamos await aqui para não atrasar a resposta da API para o tablet
+  // 6. DISPARAR O PUSH NOTIFICATION
   const title = `Mesa ${table.number}`;
-  const body = type === 'REQUEST_BILL' ? '💰 Pediu a conta!' : '👋 Chamando garçom!';
+  let body = '';
+
+  if (type === 'REQUEST_BILL') {
+    // Formata texto amigável para o método de pagamento
+    const paymentLabels = {
+        'credit': '💳 Crédito',
+        'debit': '💳 Débito',
+        'pix': '💠 PIX',
+        'cash': '💵 Dinheiro',
+        'split': '➗ Dividir Conta'
+    };
+    
+    const methodText = paymentMethod && paymentLabels[paymentMethod] 
+        ? `via ${paymentLabels[paymentMethod]}` 
+        : '';
+
+    body = `💰 Pediu a conta! ${methodText}`;
+  } else {
+    body = '👋 Chamando garçom!';
+  }
   
+  // Envia sem await para não travar a resposta HTTP
   sendPushToRestaurantTeam(restaurantId, {
     title: title,
     body: body,
-    icon: '/icons/icon-192x192.png', // Ajuste conforme seu frontend
+    icon: '/icons/icon-192x192.png', // Ajuste conforme assets do front
     badge: '/icons/badge.png',
     data: {
-      url: `/waiter/tables` // URL para o garçom abrir ao clicar
+      url: `/waiter/tables`
     }
   });
 
@@ -171,7 +185,7 @@ exports.createNotification = async (restaurantId, data) => {
 };
 
 /**
- * Lista todas as notificações pendentes para o Painel do Garçom
+ * Lista todas as notificações pendentes
  */
 exports.getPendingNotifications = async (restaurantId) => {
   return await Notification.findAll({
@@ -182,12 +196,12 @@ exports.getPendingNotifications = async (restaurantId) => {
     include: [
       { model: Table, attributes: ['number'] }
     ],
-    order: [['createdAt', 'ASC']] // FIFO: Atender quem chamou primeiro
+    order: [['createdAt', 'ASC']] // FIFO
   });
 };
 
 /**
- * Marca a notificação como resolvida (Atendida)
+ * Marca como resolvido e reverte status da mesa
  */
 exports.resolveNotification = async (restaurantId, notificationId) => {
   const notification = await Notification.findOne({ 
@@ -202,8 +216,7 @@ exports.resolveNotification = async (restaurantId, notificationId) => {
   notification.resolvedAt = new Date();
   await notification.save();
 
-  // 7. REVERTER STATUS DA MESA
-  // Se o garçom atendeu o chamado, a mesa para de "piscar" (volta ao estado normal)
+  // Reverter status da mesa se necessário
   const table = await Table.findByPk(notification.tableId);
   if (table && ['calling', 'closing'].includes(table.status)) {
     // Se tem sessão aberta, volta para ocupada. Se não, volta para livre.
