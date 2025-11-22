@@ -12,30 +12,23 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
     process.env.VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
   );
-} else {
-  console.warn('⚠️ Chaves VAPID não configuradas. Notificações Push não funcionarão.');
 }
 
 // ============================================================
-// FUNÇÕES AUXILIARES DE PUSH (SUBSCRIPTION & SENDING)
+// FUNÇÕES AUXILIARES DE PUSH (Subscrição e Envio)
 // ============================================================
 
 /**
- * Salva ou atualiza a inscrição do navegador do garçom no banco
+ * Salva a inscrição do navegador do garçom no banco de dados.
+ * Isso permite que ele receba notificações mesmo com o celular bloqueado.
  */
 exports.subscribeToPush = async (restaurantId, userId, subscription) => {
-  // subscription vem do frontend: { endpoint: '...', keys: { p256dh: '...', auth: '...' } }
-  
-  if (!subscription || !subscription.endpoint) {
-    throw new AppError('Dados de inscrição inválidos.', 400);
-  }
-
   // Verifica se já existe esse endpoint para evitar duplicação
   const existing = await PushSubscription.findOne({ where: { endpoint: subscription.endpoint } });
   
   if (existing) {
-    // Se mudou o usuário logado no mesmo navegador/dispositivo, atualiza o dono
-    if (existing.userId !== userId || existing.restaurantId !== restaurantId) {
+    // Se mudou o usuário logado no mesmo navegador, atualiza o vínculo
+    if (existing.userId !== userId) {
         existing.userId = userId;
         existing.restaurantId = restaurantId;
         await existing.save();
@@ -53,15 +46,14 @@ exports.subscribeToPush = async (restaurantId, userId, subscription) => {
 };
 
 /**
- * Envia notificação PUSH para TODOS os garçons do restaurante
- * Função interna, não exportada diretamente para o controller
+ * Função interna para disparar notificação para TODOS os garçons do restaurante.
  */
 const sendPushToRestaurantTeam = async (restaurantId, payload) => {
   try {
-    // 1. Busca todas as inscrições deste restaurante
+    // 1. Busca todas as inscrições válidas deste restaurante
     const subscriptions = await PushSubscription.findAll({ where: { restaurantId } });
     
-    if (subscriptions.length === 0) return;
+    if (subscriptions.length === 0) return; // Ninguém inscrito
 
     const payloadString = JSON.stringify(payload);
 
@@ -74,12 +66,12 @@ const sendPushToRestaurantTeam = async (restaurantId, payload) => {
 
       return webpush.sendNotification(pushConfig, payloadString)
         .catch(async (err) => {
-          // Se der erro 410 (Gone) ou 404, significa que o usuário revogou a permissão ou desinstalou
+          // Se der erro 410 (Gone) ou 404, significa que o usuário limpou cookies ou desinstalou
           if (err.statusCode === 410 || err.statusCode === 404) {
-            console.log(`🗑️ Removendo subscrição inválida (Garçom desconectado): ${sub.id}`);
+            console.log(`🗑️ Removendo subscrição inválida/expirada: ${sub.id}`);
             await sub.destroy(); // Limpa do banco para não tentar enviar de novo
           } else {
-            console.error('Erro ao enviar push individual:', err);
+            console.error('Erro ao enviar push:', err);
           }
         });
     });
@@ -96,63 +88,82 @@ const sendPushToRestaurantTeam = async (restaurantId, payload) => {
 // ============================================================
 
 /**
- * Cria uma notificação (Chamado da Mesa) e dispara o Push
+ * Cria uma nova notificação (Chamado da Mesa).
+ * Resolve automaticamente o problema de ID Numérico vs UUID.
  */
 exports.createNotification = async (restaurantId, data) => {
-  const { tableId, type } = data; // type: 'CALL_WAITER' | 'REQUEST_BILL'
+  const { tableId: tableIdInput, type } = data; // type: 'CALL_WAITER' | 'REQUEST_BILL'
 
-  // 1. Verificar se já existe um chamado pendente desse tipo para essa mesa (Desduplicação)
+  // 1. BUSCAR A MESA CORRETA (Correção do erro "operator does not exist: uuid = integer")
+  // O frontend pode mandar "1" (number) ou "uuid-string". O banco precisa do UUID.
+  let table;
+  
+  if (!isNaN(tableIdInput) && !String(tableIdInput).includes('-')) {
+    // Se for número (1), busca pelo ID inteiro
+    table = await Table.findOne({ where: { id: tableIdInput, restaurantId } });
+  } else {
+    // Se for string (UUID), busca pelo UUID
+    table = await Table.findOne({ where: { uuid: tableIdInput, restaurantId } });
+  }
+
+  if (!table) {
+    throw new AppError('Mesa não encontrada para enviar notificação.', 404);
+  }
+
+  const realTableUUID = table.uuid; // O UUID real que o banco espera
+
+  // 2. DESDUPLICAÇÃO: Verificar se já existe um chamado pendente igual
   const existingNotification = await Notification.findOne({
-    where: {
-      restaurantId,
-      tableId,
-      type,
-      status: 'pending'
+    where: { 
+      restaurantId, 
+      tableId: realTableUUID, 
+      type, 
+      status: 'pending' 
     }
   });
 
   if (existingNotification) {
-    // Se já existe, retornamos ela sem criar nova e sem spammar push
+    // Se já existe, retorna ela sem criar spam no banco
     return existingNotification;
   }
 
-  // 2. Criar a notificação no banco
+  // 3. CRIAR A NOTIFICAÇÃO
   const notification = await Notification.create({
     restaurantId,
-    tableId,
+    tableId: realTableUUID,
     type,
     status: 'pending'
   });
 
-  // 3. Buscar dados completos (incluindo nome da mesa) para o texto do Push
+  // 4. Busca infos completas para retorno (incluindo o número da mesa para exibir)
   const fullNotification = await Notification.findByPk(notification.id, {
     include: [{ model: Table, attributes: ['number'] }]
   });
 
-  // 4. Atualizar status visual da mesa (Regra de Negócio)
+  // 5. ATUALIZAR STATUS VISUAL DA MESA
   if (type === 'REQUEST_BILL') {
-    await Table.update({ status: 'closing' }, { where: { id: tableId } });
+    table.status = 'closing'; // Muda cor para Vermelho/Fechamento
+    await table.save();
   } else if (type === 'CALL_WAITER') {
-    const table = await Table.findByPk(tableId);
-    // Apenas muda para chamando se a mesa estiver ocupada (para não bugar mesas livres)
-    if (table && table.status === 'occupied') {
-      table.status = 'calling';
+    // Apenas muda para chamando se estiver ocupada (para não bugar mesa livre)
+    if (table.status === 'occupied') {
+      table.status = 'calling'; // Muda cor para Amarelo/Chamando
       await table.save();
     }
   }
 
-  // 5. 🔥 DISPARAR O PUSH NOTIFICATION 🔥
-  // Rodamos sem 'await' no retorno principal para não travar a resposta HTTP para o tablet
-  const title = `Mesa ${fullNotification.Table ? fullNotification.Table.number : '?'}`;
+  // 6. DISPARAR O PUSH NOTIFICATION (FIRE & FORGET)
+  // Não usamos await aqui para não atrasar a resposta da API para o tablet
+  const title = `Mesa ${table.number}`;
   const body = type === 'REQUEST_BILL' ? '💰 Pediu a conta!' : '👋 Chamando garçom!';
   
-  // O payload depende de como seu Service Worker no frontend trata
   sendPushToRestaurantTeam(restaurantId, {
     title: title,
     body: body,
-    icon: '/icons/icon-192x192.png', // Ajuste conforme seus assets do PWA
+    icon: '/icons/icon-192x192.png', // Ajuste conforme seu frontend
+    badge: '/icons/badge.png',
     data: {
-      url: `/waiter/tables` // URL para o garçom abrir ao clicar na notificação
+      url: `/waiter/tables` // URL para o garçom abrir ao clicar
     }
   });
 
@@ -160,7 +171,7 @@ exports.createNotification = async (restaurantId, data) => {
 };
 
 /**
- * Lista todas as notificações PENDENTES (Painel do Garçom)
+ * Lista todas as notificações pendentes para o Painel do Garçom
  */
 exports.getPendingNotifications = async (restaurantId) => {
   return await Notification.findAll({
@@ -171,12 +182,12 @@ exports.getPendingNotifications = async (restaurantId) => {
     include: [
       { model: Table, attributes: ['number'] }
     ],
-    order: [['createdAt', 'ASC']] // Os mais antigos primeiro (FIFO)
+    order: [['createdAt', 'ASC']] // FIFO: Atender quem chamou primeiro
   });
 };
 
 /**
- * Marca como Resolvido (Garçom atendeu)
+ * Marca a notificação como resolvida (Atendida)
  */
 exports.resolveNotification = async (restaurantId, notificationId) => {
   const notification = await Notification.findOne({ 
@@ -191,19 +202,17 @@ exports.resolveNotification = async (restaurantId, notificationId) => {
   notification.resolvedAt = new Date();
   await notification.save();
 
-  // Reverter status da mesa se necessário
+  // 7. REVERTER STATUS DA MESA
+  // Se o garçom atendeu o chamado, a mesa para de "piscar" (volta ao estado normal)
   const table = await Table.findByPk(notification.tableId);
-  if (table) {
-    // Se era pedido de conta ou chamado, e a mesa não foi fechada ainda, volta para o status correto
-    if (['calling', 'closing'].includes(table.status)) {
-      // Verifica se ainda tem sessão aberta para decidir se volta para Occupied ou Free
-      if (table.currentSessionId) {
-        table.status = 'occupied';
-      } else {
-        table.status = 'free';
-      }
-      await table.save();
+  if (table && ['calling', 'closing'].includes(table.status)) {
+    // Se tem sessão aberta, volta para ocupada. Se não, volta para livre.
+    if (table.currentSessionId) {
+      table.status = 'occupied';
+    } else {
+      table.status = 'free';
     }
+    await table.save();
   }
 
   return notification;
