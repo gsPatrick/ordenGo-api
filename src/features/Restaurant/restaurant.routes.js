@@ -2,30 +2,53 @@ const express = require('express');
 const restaurantController = require('./restaurant.controller');
 const { protect, restrictTo } = require('../../middlewares/authMiddleware');
 const upload = require('../../utils/upload');
+const { Table } = require('../../models'); // Precisamos buscar a mesa se for acesso via Token
+const AppError = require('../../utils/AppError');
 
 const router = express.Router();
 
 // ============================================================
-// ROTA PÚBLICA (Tablet / Cardápio Digital)
+// MIDDLEWARE HÍBRIDO (Token de Mesa OU Login de Gerente)
 // ============================================================
-// Permite pegar as cores e logo sem estar logado
-// GET /api/v1/settings/public/:restaurantId
+const resolveAuthOrTableToken = async (req, res, next) => {
+  // 1. Se tiver Header de Token da Mesa (x-table-token), tenta autenticar como Mesa
+  const tableToken = req.headers['x-table-token'];
+  
+  if (tableToken) {
+    const table = await Table.findOne({ where: { qrCodeToken: tableToken } });
+    if (table) {
+      req.restaurantId = table.restaurantId; // Injeta o ID do restaurante
+      return next(); // Passa direto, sem exigir login
+    }
+  }
+
+  // 2. Se não tiver token de mesa, ou for inválido, tenta autenticação normal (Bearer Token)
+  // Chama o middleware 'protect' manualmente
+  return protect(req, res, next);
+};
+
+
+// ============================================================
+// ROTA HÍBRIDA (Leitura)
+// ============================================================
+// Agora aceita tanto o Gerente (JWT) quanto o Tablet (x-table-token)
+router.get('/', resolveAuthOrTableToken, restaurantController.getSettings);
+
+// Rota Pública Explícita (caso queira usar via ID na URL)
 router.get('/public/:restaurantId', (req, res, next) => {
-    req.restaurantId = req.params.restaurantId; // Injeta o ID manualmente
+    req.restaurantId = req.params.restaurantId;
     next();
 }, restaurantController.getSettings);
 
 
 // ============================================================
-// ROTAS PROTEGIDAS (Gerente / Admin)
+// ROTAS ESTRITAMENTE PROTEGIDAS (Escrita - Apenas Gerente)
 // ============================================================
-router.use(protect); // <--- O BLOQUEIO COMEÇA AQUI
+// Daqui para baixo, exigimos login REAL de gerente, pois Tablet não pode editar configurações
+router.use(protect); 
 router.use(restrictTo('manager', 'admin'));
 
-// Leitura interna
-router.get('/', restaurantController.getSettings);
-
-// Configuração do Multer para múltiplos campos (Appearance)
+// Configuração do Multer para múltiplos campos
 const appearanceUpload = upload.fields([
   { name: 'institutionalBanners', maxCount: 10 },
   { name: 'highlightImagesLarge', maxCount: 5 },
