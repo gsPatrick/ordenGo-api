@@ -6,9 +6,10 @@ const sequelize = require('../config/database');
 const Restaurant = require('./Restaurant');
 const RestaurantConfig = require('./RestaurantConfig');
 const User = require('./User');
+const PushSubscription = require('./PushSubscription'); // Novo: Notificações PWA
 const Banner = require('./Banner'); // Screensavers internos
-const SystemAd = require('./SystemAd'); // Ads do SuperAdmin (Novo)
-const Promotion = require('./Promotion'); // Promoções (Novo)
+const SystemAd = require('./SystemAd'); // Ads do SuperAdmin
+const Promotion = require('./Promotion');
 const Category = require('./Category');
 const Product = require('./Product');
 const ProductVariant = require('./ProductVariant');
@@ -19,7 +20,7 @@ const TableSession = require('./TableSession');
 const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const Notification = require('./Notification');
-const Review = require('./Review'); // Feedback (Novo)
+const Review = require('./Review');
 
 // ============================================================
 // DEFINIÇÃO DAS ASSOCIAÇÕES (RELATIONSHIPS)
@@ -35,6 +36,13 @@ RestaurantConfig.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 // Equipe
 Restaurant.hasMany(User, { foreignKey: 'restaurantId' });
 User.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
+// Notificações Push (PWA)
+Restaurant.hasMany(PushSubscription, { foreignKey: 'restaurantId' });
+PushSubscription.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
+User.hasMany(PushSubscription, { foreignKey: 'userId' });
+PushSubscription.belongsTo(User, { foreignKey: 'userId' });
 
 // Marketing
 Restaurant.hasMany(Banner, { foreignKey: 'restaurantId' });
@@ -96,7 +104,7 @@ Table.hasMany(TableSession, { as: 'history', foreignKey: 'tableId' });
 TableSession.belongsTo(Table, { foreignKey: 'tableId' });
 
 // Relação especial para acesso rápido à sessão ATUAL
-// 'constraints: false' evita erros de chave estrangeira cíclica
+// 'constraints: false' evita erros de chave estrangeira cíclica ao criar tabelas
 Table.belongsTo(TableSession, { as: 'activeSession', foreignKey: 'currentSessionId', constraints: false });
 
 // Notificações da Mesa
@@ -132,12 +140,6 @@ OrderItem.belongsTo(Product, { foreignKey: 'productId' });
 OrderItem.belongsTo(ProductVariant, { foreignKey: 'productVariantId' }); // Pode ser null se não tiver variante
 
 
-// --- 6. SystemAds (Ads do SuperAdmin) ---
-// Este model é global e não tem relação direta de chave estrangeira obrigatória
-// com os tenants, pois a lógica é filtrada por Estado/Região via código.
-// Apenas exportamos ele abaixo.
-
-
 // ============================================================
 // EXPORTAÇÃO
 // ============================================================
@@ -147,6 +149,7 @@ module.exports = {
   Restaurant,
   RestaurantConfig,
   User,
+  PushSubscription, // Exportando o novo model
   Banner,
   SystemAd,
   Promotion,
