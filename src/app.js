@@ -4,7 +4,8 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const cors = require('cors');
-const { sequelize } = require('./models');
+const bcrypt = require('bcryptjs'); // Necessário para hash da senha
+const { sequelize, User, Restaurant, RestaurantConfig } = require('./models');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./controllers/error.controller');
 const routes = require('./routes');
@@ -17,27 +18,22 @@ const server = http.createServer(app);
 // ============================================================
 const io = socketIo(server, {
   cors: {
-    origin: "*", // Libera acesso de qualquer frontend (localhost, vercel, etc)
+    origin: "*",
     methods: ["GET", "POST"],
     allowedHeaders: ["my-custom-header"],
     credentials: true
   }
 });
 
-// Middleware para injetar o 'io' em todas as requisições HTTP
-// Isso permite chamar req.io.emit() dentro dos Controllers
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
 
-// Lógica de Conexão Real-Time
 io.on('connection', (socket) => {
   console.log(`🔌 Socket conectado: ${socket.id}`);
 
-  // Evento para entrar em uma sala (Room)
   socket.on('join_room', (data) => {
-    // data esperada: { restaurantId, type, tableId }
     if (data.type === 'waiter' || data.type === 'kitchen') {
       const room = `restaurant_${data.restaurantId}`;
       socket.join(room);
@@ -58,45 +54,91 @@ io.on('connection', (socket) => {
 // ============================================================
 // 2. MIDDLEWARES GLOBAIS
 // ============================================================
-
-// CORS - Permitir acesso total HTTP
 app.use(cors());
-
-// Body Parser - Ler JSON e FormUrlEncoded
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
-
-// Servir Arquivos Estáticos (Imagens de Upload)
-// Acessível em: http://localhost:3000/uploads/nome-da-imagem.jpg
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // ============================================================
 // 3. ROTAS
 // ============================================================
-
-// Prefixo da API
 app.use('/api/v1', routes);
 
-// Tratamento para rotas não encontradas (404)
-// CORREÇÃO APLICADA: Usando Regex /(.*)/ em vez de string '*'
-// Isso resolve o erro "Missing parameter name at index 1"
 app.all(/(.*)/, (req, res, next) => {
   next(new AppError(`Não foi possível encontrar ${req.originalUrl} neste servidor!`, 404));
 });
 
-// Handler Global de Erros
 app.use(globalErrorHandler);
 
 // ============================================================
-// 4. INICIALIZAÇÃO DO SERVIDOR
+// 4. FUNÇÃO DE SEED AUTOMÁTICO (SUPER ADMIN)
+// ============================================================
+async function createDefaultSuperAdmin() {
+  try {
+    const email = 'superadmin@gmail.com';
+    const passwordPlain = 'superadmin123';
+
+    // 1. Verifica se o usuário já existe
+    const adminExists = await User.findOne({ where: { email } });
+    if (adminExists) {
+      console.log('✅ Super Admin já existe no banco de dados.');
+      return;
+    }
+
+    console.log('⚡ Criando Super Admin padrão...');
+
+    // 2. Verifica/Cria o Restaurante "HQ" (SaaS Admin precisa estar vinculado a algo)
+    let hq = await Restaurant.findOne({ where: { slug: 'ordengo-admin' } });
+    
+    if (!hq) {
+      hq = await Restaurant.create({
+        name: 'OrdenGo HQ',
+        slug: 'ordengo-admin', // Slug reservado
+        isActive: true,
+        planType: 'enterprise',
+        currency: 'BRL'
+      });
+
+      // Cria config padrão para não quebrar se ele tentar acessar settings
+      await RestaurantConfig.create({
+        restaurantId: hq.id,
+        primaryColor: '#000000',
+        backgroundColor: '#ffffff'
+      });
+    }
+
+    // 3. Cria o Usuário
+    const hashedPassword = await bcrypt.hash(passwordPlain, 12);
+
+    await User.create({
+      restaurantId: hq.id,
+      name: 'Super Admin',
+      email: email,
+      password: hashedPassword,
+      role: 'superadmin' // Role especial
+    });
+
+    console.log(`👑 Super Admin criado com sucesso!`);
+    console.log(`📧 Email: ${email}`);
+    console.log(`🔑 Senha: ${passwordPlain}`);
+
+  } catch (error) {
+    console.error('❌ Erro ao criar Super Admin automático:', error);
+  }
+}
+
+// ============================================================
+// 5. INICIALIZAÇÃO DO SERVIDOR
 // ============================================================
 const PORT = process.env.PORT || 3000;
 
-// Sincroniza o banco de dados e inicia o servidor
-// { alter: true } tenta ajustar as tabelas sem apagar dados.
 sequelize.sync({ alter: true }) 
-  .then(() => {
+  .then(async () => {
     console.log('💾 Banco de dados conectado e sincronizado.');
+    
+    // Executa a verificação/criação do Admin
+    await createDefaultSuperAdmin();
+
     server.listen(PORT, () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
       console.log(`📡 Socket.io pronto (CORS: *)`);
