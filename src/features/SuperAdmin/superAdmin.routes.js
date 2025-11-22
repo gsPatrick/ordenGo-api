@@ -1,5 +1,5 @@
 const express = require('express');
-const superAdminController = require('./superadmin.controller');
+const superAdminController = require('./superAdmin.controller');
 // --- IMPORTAÇÃO QUE FALTAVA ---
 const systemAdsController = require('./systemAds.controller'); 
 const { protect, restrictTo } = require('../../middlewares/authMiddleware');
