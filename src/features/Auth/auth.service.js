@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { User, Restaurant } = require('../../models');
+const { User, Restaurant } = require('../../models'); // Importamos Restaurant
 const AppError = require('../../utils/AppError');
+const { validate: isUuid } = require('uuid'); // Ou usaremos Regex se não tiver uuid instalado
 
 // Helper para assinar Token
 const signToken = (id, role, restaurantId) => {
@@ -10,61 +11,74 @@ const signToken = (id, role, restaurantId) => {
   });
 };
 
-// Login padrão (Email + Senha) - Para Gerentes e Admin
+// Função auxiliar para verificar UUID v4
+const isValidUUID = (uuid) => {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return regex.test(uuid);
+};
+
+// Login padrão (Email + Senha)
 exports.loginUser = async (email, password) => {
-  // 1. Verificar se email e senha foram enviados
   if (!email || !password) {
     throw new AppError('Por favor, forneça email e senha.', 400);
   }
 
-  // 2. Buscar usuário e incluir dados do Restaurante para verificar se está ativo
   const user = await User.findOne({ 
     where: { email },
-    include: [{ model: Restaurant, required: true }] // required: true garante que só traz se tiver restaurante
+    include: [{ model: Restaurant, required: true }]
   });
 
-  // 3. Verificar se usuário existe e senha está correta
   if (!user || !(await bcrypt.compare(password, user.password))) {
     throw new AppError('Credenciais incorretas.', 401);
   }
 
-  // 4. Verificar se o restaurante está ativo (Bloqueio por falta de pagamento, etc)
   if (!user.Restaurant.isActive) {
-    throw new AppError('A conta deste restaurante está desativada. Contate o suporte.', 403);
+    throw new AppError('A conta deste restaurante está desativada.', 403);
   }
 
-  // 5. Gerar Token
   const token = signToken(user.id, user.role, user.restaurantId);
-
-  // Remover senha do objeto de retorno
   user.password = undefined;
 
   return { user, token };
 };
 
 // Login simplificado para Garçons (PIN)
-exports.loginWaiterWithPin = async (pin, restaurantId) => {
-  // Garçons logam com PIN, mas precisamos saber de QUAL restaurante eles são.
-  // Geralmente, o tablet já tem o restaurantId configurado ou é passado na URL.
-  
-  if (!pin || !restaurantId) {
-    throw new AppError('PIN e ID do Restaurante são obrigatórios.', 400);
+exports.loginWaiterWithPin = async (pin, restaurantIdentifier) => {
+  if (!pin || !restaurantIdentifier) {
+    throw new AppError('PIN e Identificador do Restaurante são obrigatórios.', 400);
   }
 
+  let targetRestaurantId = restaurantIdentifier;
+
+  // CORREÇÃO DO ERRO:
+  // Verifica se o "restaurantIdentifier" NÃO é um UUID válido.
+  // Se for "patrick", por exemplo, ele entra no IF.
+  if (!isValidUUID(restaurantIdentifier)) {
+    // Assume que é um SLUG e busca o ID real
+    const restaurant = await Restaurant.findOne({ where: { slug: restaurantIdentifier } });
+    
+    if (!restaurant) {
+      throw new AppError(`Restaurante '${restaurantIdentifier}' não encontrado.`, 404);
+    }
+    
+    targetRestaurantId = restaurant.id; // Pega o UUID correto (ex: 550e8400-e29b...)
+  }
+
+  // Agora busca o usuário usando o UUID correto
   const user = await User.findOne({
     where: { 
       pin, 
-      restaurantId,
-      role: 'waiter' // Segurança extra: PIN só serve para garçom
+      restaurantId: targetRestaurantId,
+      role: 'waiter'
     }
   });
 
   if (!user) {
-    throw new AppError('PIN inválido.', 401);
+    throw new AppError('PIN incorreto ou usuário não encontrado neste restaurante.', 401);
   }
 
   const token = signToken(user.id, user.role, user.restaurantId);
-  user.password = undefined; // Garante segurança
+  user.password = undefined;
 
   return { user, token };
 };
