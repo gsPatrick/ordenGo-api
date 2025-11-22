@@ -6,20 +6,28 @@ const upload = require('../../utils/upload');
 const router = express.Router();
 
 // ============================================================
-// ROTA PÚBLICA (Para o Tablet)
+// ROTA PÚBLICA (Para o Tablet - Sem Login)
 // ============================================================
-// O tablet chama /api/menu/public/:restaurantId (ou usa o token da mesa em outra rota)
-// Aqui vamos permitir listar se tiver o ID.
+// O tablet chama /api/v1/menu/public/:restaurantId
 router.get('/public/:restaurantId', (req, res, next) => {
-    req.restaurantId = req.params.restaurantId; // Injeta ID manualmente para o controller funcionar
+    req.restaurantId = req.params.restaurantId;
     next();
 }, menuController.getMenu);
 
 
 // ============================================================
-// ROTAS PROTEGIDAS (Gerente)
+// ROTAS PROTEGIDAS (Equipe Logada)
 // ============================================================
-router.use(protect);
+router.use(protect); // Exige token válido
+
+// --- ROTAS DE LEITURA (Liberadas para Garçom, Gerente e Admin) ---
+// O Garçom precisa ver o menu para lançar pedidos
+router.get('/', restrictTo('manager', 'admin', 'waiter'), menuController.getMenu);
+router.get('/modifiers', restrictTo('manager', 'admin', 'waiter'), menuController.listModifiers);
+
+
+// --- ROTAS DE ESCRITA (Apenas Gerentes e Admins) ---
+// Daqui para baixo, Garçom NÃO passa
 router.use(restrictTo('manager', 'admin'));
 
 // Categorias
@@ -30,11 +38,7 @@ router.patch('/categories/:id', upload.single('image'), menuController.updateCat
 router.post('/products', upload.single('image'), menuController.createProduct);
 router.patch('/products/:id/availability', menuController.toggleAvailability); // "86 it" rápido
 
-// Modificadores
-router.get('/modifiers', menuController.listModifiers);
+// Modificadores (Escrita)
 router.post('/modifiers', menuController.createModifierGroup);
-
-// Leitura interna (para o painel admin preencher as tabelas)
-router.get('/', menuController.getMenu);
 
 module.exports = router;
