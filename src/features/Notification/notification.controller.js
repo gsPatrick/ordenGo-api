@@ -1,23 +1,20 @@
 const notificationService = require('./notification.service');
 const catchAsync = require('../../utils/catchAsync');
 
-// ============================================================
-// CRIAÇÃO E LISTAGEM
-// ============================================================
-
 exports.create = catchAsync(async (req, res, next) => {
-  // req.restaurantId vem do middleware (se logado) ou body (se público/tablet)
   const restaurantId = req.restaurantId || req.body.restaurantId;
   
   const notification = await notificationService.createNotification(restaurantId, req.body);
 
-  // 🔥 REAL-TIME (SOCKET): Toca o sino no painel do garçom que estiver com o app aberto
   if (req.io) {
+    // Avisa que tem nova notificação
     req.io.to(`restaurant_${restaurantId}`).emit('new_notification', notification);
+    
+    // Avisa que a mesa mudou de status (ficou amarela/vermelha)
+    // Precisamos buscar a mesa atualizada para enviar o status correto, 
+    // mas o createNotification já atualizou o DB. O front vai pegar no polling ou podemos forçar aqui.
+    // Para simplificar, emitimos apenas a notification, o front já reage a isso.
   }
-
-  // NOTA: O disparo do Web Push (celular bloqueado) acontece dentro do notification.service.js 
-  // para não bloquear a resposta da API.
 
   res.status(201).json({
     status: 'success',
@@ -35,17 +32,22 @@ exports.listPending = catchAsync(async (req, res, next) => {
   });
 });
 
-// ============================================================
-// RESOLUÇÃO
-// ============================================================
-
+// --- CORREÇÃO AQUI ---
 exports.resolve = catchAsync(async (req, res, next) => {
-  const notification = await notificationService.resolveNotification(req.restaurantId, req.params.id);
+  // O service agora retorna { notification, table }
+  const { notification, table } = await notificationService.resolveNotification(req.restaurantId, req.params.id);
 
-  // 🔥 REAL-TIME (SOCKET): Remove o alerta da tela de todos os garçons
-  // (para ninguém ir atender uma mesa que já foi atendida por outro colega)
+  // 🔥 REAL-TIME (SOCKET):
   if (req.io) {
-    req.io.to(`restaurant_${req.restaurantId}`).emit('notification_resolved', { id: notification.id });
+    const room = `restaurant_${req.restaurantId}`;
+    
+    // 1. Remove o alerta da tela de todos
+    req.io.to(room).emit('notification_resolved', { id: notification.id });
+
+    // 2. Atualiza o status da mesa na tela de todos (volta para Ocupada/Verde/Azul)
+    if (table) {
+      req.io.to(room).emit('table_updated', table);
+    }
   }
 
   res.status(200).json({
@@ -54,15 +56,7 @@ exports.resolve = catchAsync(async (req, res, next) => {
   });
 });
 
-// ============================================================
-// WEB PUSH (PWA)
-// ============================================================
-
 exports.subscribePush = catchAsync(async (req, res, next) => {
-  // Rota chamada pelo App do Garçom quando ele clica em "Ativar Notificações"
-  // req.body contém o objeto 'subscription' gerado pelo navegador (endpoint, keys)
-  // req.user.id vem do token de autenticação do garçom
-  
   await notificationService.subscribeToPush(
     req.restaurantId, 
     req.user.id, 

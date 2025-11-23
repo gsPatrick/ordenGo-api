@@ -216,8 +216,7 @@ exports.resolveNotification = async (restaurantId, notificationId) => {
   notification.resolvedAt = new Date();
   await notification.save();
 
-  // Reverter status da mesa se necessário
-  // CORREÇÃO CRÍTICA: Busca por UUID, não por ID numérico
+  // Reverter status da mesa
   const table = await Table.findOne({ 
     where: { uuid: notification.tableId } 
   });
@@ -232,5 +231,6 @@ exports.resolveNotification = async (restaurantId, notificationId) => {
     await table.save();
   }
 
-  return notification;
+  // RETORNA UM OBJETO COM A NOTIFICAÇÃO E A MESA ATUALIZADA
+  return { notification, table };
 };
