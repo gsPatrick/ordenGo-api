@@ -1,6 +1,7 @@
 const orderService = require('./order.service');
 const catchAsync = require('../../utils/catchAsync');
 const AppError = require('../../utils/AppError');
+const { Notification, Table } = require('../../models'); // <--- IMPORTAR MODELS
 
 // --- SESSÃO ---
 
@@ -28,23 +29,33 @@ exports.closeSession = catchAsync(async (req, res, next) => {
   const { paymentMethod } = req.body;
   const session = await orderService.closeSession(req.restaurantId, req.params.id, paymentMethod);
   
+  // --- CORREÇÃO 1: Limpar TODAS as notificações pendentes desta mesa ---
+  // Isso impede que sobrem notificações antigas após fechar a conta
+  await Notification.update(
+    { status: 'resolved', resolvedAt: new Date() },
+    { 
+      where: { 
+        tableId: session.tableId, // UUID da mesa
+        status: 'pending' 
+      } 
+    }
+  );
+
   const io = req.io;
   const restaurantRoom = `restaurant_${req.restaurantId}`;
   
-  // 1. Avisa o Dashboard do Garçom (Atualiza lista de mesas)
+  // Avisa o Dashboard (Limpa alertas e muda cor da mesa)
   io.to(restaurantRoom).emit('table_freed', { tableId: session.tableId });
+  
+  // Emite evento para limpar notificações visuais no painel do garçom
+  // (Caso o frontend do garçom esteja ouvindo especificamente remoções)
+  io.to(restaurantRoom).emit('notifications_cleared', { tableId: session.tableId });
 
-  // 2. --- MUDANÇA: Avisa TODOS no restaurante que essa mesa fechou ---
-  // O payload contém o tableId (UUID) para o tablet verificar se é ele
-  io.to(restaurantRoom).emit('session_closed', { 
-    tableId: session.tableId // UUID da Mesa
-  }); 
-
-  // (Backup) Avisa a sala específica da mesa também
+  // Avisa o Tablet da Mesa
   io.to(`table_${session.tableId}`).emit('session_closed', { tableId: session.tableId });
 
   res.status(200).json({ status: 'success', data: { session } });
-}); 
+});
 
 exports.getSessionDetails = catchAsync(async (req, res, next) => {
   const orders = await orderService.getSessionOrders(req.params.sessionId);
