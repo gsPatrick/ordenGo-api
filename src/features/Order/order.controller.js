@@ -36,7 +36,7 @@ exports.closeSession = catchAsync(async (req, res, next) => {
   req.io.to(`table_${session.tableId}`).emit('session_closed'); 
 
   res.status(200).json({ status: 'success', data: { session } });
-});
+}); 
 
 exports.getSessionDetails = catchAsync(async (req, res, next) => {
   const orders = await orderService.getSessionOrders(req.params.sessionId);
