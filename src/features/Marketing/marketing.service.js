@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Banner, Promotion, SystemAd, Restaurant } = require('../../models');
+const { Banner, SystemAd, Restaurant, Product } = require('../../models'); // Importar Product
 const AppError = require('../../utils/AppError');
 
 // ============================================================
@@ -10,13 +10,14 @@ const AppError = require('../../utils/AppError');
  * Cria um Banner interno do Restaurante
  */
 exports.createScreensaver = async (restaurantId, data) => {
-  // data.filename vem do controller
   const imageUrl = `/uploads/${data.filename}`;
   
   return await Banner.create({
     restaurantId,
     imageUrl,
-    title: data.title, // Opcional
+    title: data.title, 
+    description: data.description, // Novo
+    linkedProductId: data.linkedProductId || null, // Novo (UUID do produto)
     order: data.order || 0,
     isActive: true
   });
@@ -26,14 +27,19 @@ exports.createScreensaver = async (restaurantId, data) => {
  * Busca Banners para o Tablet (Mistura Banners do Restaurante + Ads do Sistema)
  */
 exports.getScreensavers = async (restaurantId, onlyActive = true) => {
-  // 1. Busca banners internos do restaurante
   const where = { restaurantId };
   if (onlyActive) where.isActive = true;
 
   const internalBanners = await Banner.findAll({
     where,
     order: [['order', 'ASC'], ['createdAt', 'DESC']],
-    raw: true
+    include: [
+        { 
+            model: Product, 
+            as: 'linkedProduct',
+            attributes: ['id', 'name', 'price', 'imageUrl'] // Dados para abrir o modal direto
+        }
+    ]
   });
 
   // 2. Busca dados do Restaurante para saber a Região (Estado/UF)
@@ -70,8 +76,10 @@ exports.getScreensavers = async (restaurantId, onlyActive = true) => {
   const formattedInternal = internalBanners.map(b => ({
     id: b.id,
     imageUrl: b.imageUrl,
-    title: b.title, // Pode ser objeto JSONB
-    isAd: false, // Identificador para o frontend: É do restaurante
+    title: b.title, 
+    description: b.description,
+    linkedProduct: b.linkedProduct, // O frontend verifica: se existir, clica e abre
+    isAd: false,
     linkUrl: b.actionLink
   }));
 

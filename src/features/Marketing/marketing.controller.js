@@ -14,6 +14,11 @@ exports.createScreensaver = catchAsync(async (req, res, next) => {
   if (!req.file) return next(new AppError('Imagem é obrigatória', 400));
   
   const data = { ...req.body, filename: req.file.filename };
+  
+  // Parse dos JSONs vindos do FormData
+  if (data.title && typeof data.title === 'string') data.title = JSON.parse(data.title);
+  if (data.description && typeof data.description === 'string') data.description = JSON.parse(data.description);
+  
   const banner = await marketingService.createScreensaver(req.restaurantId, data);
 
   res.status(201).json({ status: 'success', data: { banner } });

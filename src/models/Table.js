@@ -42,6 +42,38 @@ const Table = sequelize.define('Table', {
     type: DataTypes.BIGINT, // BIGINT para aguentar muitos segundos
     defaultValue: 0,
     comment: 'Total de segundos que a mesa esteve ocupada na vida útil'
+  },
+
+  // --- CONTADORES (Telemetria) ---
+  lifetimeSessionCount: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+  },
+  lifetimeOccupiedSeconds: { // Tempo total que a mesa esteve com clientes (sessões)
+    type: DataTypes.BIGINT, 
+    defaultValue: 0,
+  },
+
+  // --- DADOS DO DISPOSITIVO CONECTADO (Tablet) ---
+  deviceConnectedAt: {
+    type: DataTypes.DATE, // Quando o tablet leu o QR Code
+    allowNull: true,
+  },
+  deviceIp: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  deviceAgent: { // Navegador/Modelo do Tablet
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  deviceLocation: { // Ex: "São Paulo, BR" (preenchido via API externa ou IP)
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  isDeviceConnected: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
   }
 });
 

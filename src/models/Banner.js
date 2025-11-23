@@ -15,14 +15,15 @@ const Banner = sequelize.define('Banner', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  // NOVOS CAMPOS
   title: {
-    type: DataTypes.JSONB, // Traduzível
+    type: DataTypes.JSONB, // { pt: "Promoção", en: "Promo" }
   },
-  subtitle: {
-    type: DataTypes.JSONB,
+  description: {
+    type: DataTypes.JSONB, // { pt: "Compre 2 leve 3...", en: "..." }
   },
-  actionLink: { // Se clicar, pode levar para um produto específico
-    type: DataTypes.STRING, // ex: 'product_id_123'
+  linkedProductId: { // Se o usuário clicar, abre este produto
+    type: DataTypes.UUID,
     allowNull: true,
   },
   order: {

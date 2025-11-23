@@ -33,4 +33,7 @@ router.use(restrictTo('manager', 'superadmin'));
 router.post('/', tableController.create);
 router.delete('/:id', tableController.delete);
 
+router.post('/:id/disconnect', restrictTo('manager', 'admin'), tableController.disconnectDevice);
+
+
 module.exports = router;

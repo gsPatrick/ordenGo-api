@@ -105,3 +105,52 @@ exports.updateStatus = async (restaurantId, tableId, status) => {
   await table.save();
   return table;
 };
+
+/**
+ * Registra a conexão do Tablet (Ao ler o QR Code)
+ */
+exports.connectDeviceToTable = async (token, deviceInfo) => {
+  const table = await Table.findOne({
+    where: { qrCodeToken: token },
+    include: [
+      {
+        model: Restaurant,
+        attributes: ['id', 'name', 'currency', 'locales'],
+        include: [{ model: RestaurantConfig, as: 'config' }]
+      }
+    ]
+  });
+
+  if (!table) {
+    throw new AppError('QR Code inválido ou mesa não encontrada.', 404);
+  }
+
+  // Salva os dados do dispositivo ("Vínculo")
+  table.deviceConnectedAt = new Date();
+  table.deviceIp = deviceInfo.ip;
+  table.deviceAgent = deviceInfo.userAgent;
+  // table.deviceLocation = deviceInfo.location; // Seria preenchido se usasse geoip-lite
+  table.isDeviceConnected = true;
+  
+  await table.save();
+
+  return table;
+};
+
+/**
+ * Gerente desconecta o tablet remotamente (Força logout)
+ */
+exports.disconnectDevice = async (restaurantId, tableUuid) => {
+  const table = await Table.findOne({ where: { uuid: tableUuid, restaurantId } });
+  
+  if (!table) throw new AppError('Mesa não encontrada.', 404);
+
+  table.deviceConnectedAt = null;
+  table.deviceIp = null;
+  table.deviceAgent = null;
+  table.isDeviceConnected = false;
+  
+  await table.save();
+  
+  return table;
+};
