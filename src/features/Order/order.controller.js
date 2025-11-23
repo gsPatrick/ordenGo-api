@@ -28,12 +28,20 @@ exports.closeSession = catchAsync(async (req, res, next) => {
   const { paymentMethod } = req.body;
   const session = await orderService.closeSession(req.restaurantId, req.params.id, paymentMethod);
   
-  // 1. Avisa o Dashboard do Garçom (Geral)
-  req.io.to(`restaurant_${req.restaurantId}`).emit('table_freed', { tableId: session.tableId });
+  const io = req.io;
+  const restaurantRoom = `restaurant_${req.restaurantId}`;
+  
+  // 1. Avisa o Dashboard do Garçom (Atualiza lista de mesas)
+  io.to(restaurantRoom).emit('table_freed', { tableId: session.tableId });
 
-  // 2. --- NOVO: Avisa o Tablet da Mesa Específica ---
-  // session.tableId é o UUID da mesa
-  req.io.to(`table_${session.tableId}`).emit('session_closed'); 
+  // 2. --- MUDANÇA: Avisa TODOS no restaurante que essa mesa fechou ---
+  // O payload contém o tableId (UUID) para o tablet verificar se é ele
+  io.to(restaurantRoom).emit('session_closed', { 
+    tableId: session.tableId // UUID da Mesa
+  }); 
+
+  // (Backup) Avisa a sala específica da mesa também
+  io.to(`table_${session.tableId}`).emit('session_closed', { tableId: session.tableId });
 
   res.status(200).json({ status: 'success', data: { session } });
 }); 
