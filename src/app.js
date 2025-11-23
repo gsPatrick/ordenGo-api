@@ -132,7 +132,7 @@ async function createDefaultSuperAdmin() {
 // ============================================================
 const PORT = process.env.PORT || 3000;
 
-sequelize.sync({ force: true }) 
+sequelize.sync({ force: false }) 
   .then(async () => {
     console.log('💾 Banco de dados conectado e sincronizado.');
     

@@ -1,9 +1,10 @@
 const restaurantService = require('./restaurant.service');
 const catchAsync = require('../../utils/catchAsync');
+const AppError = require('../../utils/AppError'); // <--- IMPORTAÇÃO QUE FALTAVA
 
 // GET /settings
 exports.getSettings = catchAsync(async (req, res, next) => {
-  // req.restaurantId vem do middleware 'protect'
+  // req.restaurantId vem do middleware 'protect' ou do token da mesa
   const data = await restaurantService.getRestaurantSettings(req.restaurantId);
 
   res.status(200).json({
@@ -26,6 +27,7 @@ exports.updateAppearance = catchAsync(async (req, res, next) => {
       data.institutionalBanners = mapFiles(req.files.institutionalBanners);
     }
     if (req.files.highlightImagesLarge) {
+      // Pega apenas o primeiro se vier como array
       data.highlightImagesLarge = mapFiles(req.files.highlightImagesLarge);
     }
     if (req.files.highlightImagesSmall) {
@@ -34,7 +36,6 @@ exports.updateAppearance = catchAsync(async (req, res, next) => {
   }
 
   // Parse de JSONs vindos do FormData (Se o frontend enviar stringificado)
-  // Ex: '{"pt": "Olá"}' vira objeto
   ['publicTitle', 'aboutTitle', 'aboutText', 'ourHistory'].forEach(field => {
     if (data[field] && typeof data[field] === 'string') {
       try { data[field] = JSON.parse(data[field]); } catch(e) {}
@@ -76,7 +77,7 @@ exports.uploadLogo = catchAsync(async (req, res, next) => {
   });
 });
 
-// Adicione este método
+// POST /settings/onboarding/complete
 exports.finalizeOnboarding = catchAsync(async (req, res, next) => {
   await restaurantService.completeOnboarding(req.restaurantId);
 
