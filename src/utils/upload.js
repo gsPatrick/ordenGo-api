@@ -1,35 +1,48 @@
 // src/utils/upload.js
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const AppError = require('./AppError');
 
-// Configuração de Armazenamento Local
+// Cria a pasta caso não exista
+const ensureDirectoryExistence = (filePath) => {
+  if (!fs.existsSync(filePath)) {
+    fs.mkdirSync(filePath, { recursive: true });
+  }
+};
+
+// Configuração de armazenamento (sem limites)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Certifique-se de criar a pasta 'public/uploads' na raiz do projeto
-    cb(null, 'public/uploads');
+    const uploadPath = 'public/uploads';
+    
+    ensureDirectoryExistence(uploadPath);
+    cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
-    // Nome único: restaurant-{id}-{timestamp}.ext
-    const ext = file.mimetype.split('/')[1];
-    const uniqueSuffix = `restaurant-${req.restaurantId}-${Date.now()}.${ext}`;
+    const id = req.restaurantId || 'unknown';
+
+    // tenta pegar extensão do mimetype, senão usa a original
+    const ext =
+      file.mimetype?.split('/')[1] ||
+      path.extname(file.originalname).replace('.', '') ||
+      'bin';
+
+    const uniqueSuffix = `restaurant-${id}-${Date.now()}.${ext}`;
     cb(null, uniqueSuffix);
   }
 });
 
-// Filtro para aceitar apenas Imagens
+// Sem filtro → aceita qualquer arquivo
 const multerFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image')) {
-    cb(null, true);
-  } else {
-    cb(new AppError('Não é uma imagem! Por favor faça upload apenas de imagens.', 400), false);
-  }
+  cb(null, true);
 };
 
+// Upload ilimitado (sem limites de tamanho)
 const upload = multer({
   storage: storage,
   fileFilter: multerFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // Limite de 5MB
+  limits: {} // vazio = sem limite
 });
 
 module.exports = upload;
