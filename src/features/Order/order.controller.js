@@ -28,7 +28,12 @@ exports.closeSession = catchAsync(async (req, res, next) => {
   const { paymentMethod } = req.body;
   const session = await orderService.closeSession(req.restaurantId, req.params.id, paymentMethod);
   
+  // 1. Avisa o Dashboard do Garçom (Geral)
   req.io.to(`restaurant_${req.restaurantId}`).emit('table_freed', { tableId: session.tableId });
+
+  // 2. --- NOVO: Avisa o Tablet da Mesa Específica ---
+  // session.tableId é o UUID da mesa
+  req.io.to(`table_${session.tableId}`).emit('session_closed'); 
 
   res.status(200).json({ status: 'success', data: { session } });
 });
