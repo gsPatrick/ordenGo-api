@@ -11,7 +11,7 @@ const Restaurant = sequelize.define('Restaurant', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  slug: { // Para acesso via URL única ex: app.ordengo.com/pizzaria-luigi
+  slug: { 
     type: DataTypes.STRING,
     unique: true,
   },
@@ -19,24 +19,30 @@ const Restaurant = sequelize.define('Restaurant', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
+  // --- NOVO CAMPO ---
+  isOnboardingCompleted: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  // ------------------
   planType: {
     type: DataTypes.ENUM('basic', 'premium', 'enterprise'),
     defaultValue: 'basic',
   },
   currency: {
     type: DataTypes.STRING(3),
-    defaultValue: 'BRL', // USD, EUR
+    defaultValue: 'BRL', 
   },
   addressCity: {
     type: DataTypes.STRING,
     allowNull: true,
   },
-  addressState: { // UF ou Estado (ex: "SP", "RJ", "FL")
+  addressState: { 
     type: DataTypes.STRING(2), 
     allowNull: true,
   },
   locales: {
-    type: DataTypes.ARRAY(DataTypes.STRING), // ['pt-BR', 'en-US', 'es-ES']
+    type: DataTypes.ARRAY(DataTypes.STRING), 
     defaultValue: ['pt-BR'],
   }
 });

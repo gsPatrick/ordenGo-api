@@ -75,3 +75,13 @@ exports.uploadLogo = catchAsync(async (req, res, next) => {
     data: { logoUrl }
   });
 });
+
+// Adicione este método
+exports.finalizeOnboarding = catchAsync(async (req, res, next) => {
+  await restaurantService.completeOnboarding(req.restaurantId);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Onboarding concluído com sucesso!'
+  });
+});

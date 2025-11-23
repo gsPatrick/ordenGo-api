@@ -23,10 +23,11 @@ exports.loginUser = async (email, password) => {
     throw new AppError('Por favor, forneça email e senha.', 400);
   }
 
-  const user = await User.findOne({ 
-    where: { email },
-    include: [{ model: Restaurant, required: true }]
-  });
+const user = await User.findOne({ 
+  where: { email },
+  // Certifique-se de incluir isOnboardingCompleted
+  include: [{ model: Restaurant, required: true, attributes: ['id', 'isActive', 'isOnboardingCompleted', 'slug'] }] 
+});
 
   if (!user || !(await bcrypt.compare(password, user.password))) {
     throw new AppError('Credenciais incorretas.', 401);

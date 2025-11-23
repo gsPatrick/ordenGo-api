@@ -64,4 +64,6 @@ router.patch('/', upload.any(), async (req, res, next) => {
     return restaurantController.updateGeneral(req, res, next);
 });
 
+router.post('/onboarding/complete', restrictTo('manager', 'admin'), restaurantController.finalizeOnboarding);
+
 module.exports = router;

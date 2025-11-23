@@ -75,3 +75,18 @@ exports.updateLogo = async (restaurantId, filename) => {
 
   return config.logoUrl;
 };
+
+/**
+ * Marca o onboarding como concluído
+ */
+exports.completeOnboarding = async (restaurantId) => {
+  const restaurant = await Restaurant.findByPk(restaurantId);
+  if (!restaurant) {
+    throw new AppError('Restaurante não encontrado.', 404);
+  }
+
+  restaurant.isOnboardingCompleted = true;
+  await restaurant.save();
+
+  return restaurant;
+};
