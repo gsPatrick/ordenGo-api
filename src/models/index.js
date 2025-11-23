@@ -42,6 +42,9 @@ PushSubscription.belongsTo(User, { foreignKey: 'userId' });
 Restaurant.hasMany(Banner, { foreignKey: 'restaurantId' });
 Banner.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
+// --- CORREÇÃO AQUI: Associação Banner -> Produto ---
+Banner.belongsTo(Product, { foreignKey: 'linkedProductId', as: 'linkedProduct' });
+
 Restaurant.hasMany(Promotion, { foreignKey: 'restaurantId' });
 Promotion.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
@@ -84,22 +87,20 @@ ModifierGroup.hasMany(Modifier, { as: 'options', foreignKey: 'modifierGroupId', 
 Modifier.belongsTo(ModifierGroup, { foreignKey: 'modifierGroupId' });
 
 
-// --- 3. Mesas e Sessões (CORREÇÃO DE UUID) ---
+// --- 3. Mesas e Sessões ---
 
-// CRÍTICO: Adicionamos sourceKey: 'uuid' e targetKey: 'uuid'
-// Isso força o Sequelize a fazer o JOIN usando a coluna UUID da mesa, e não o ID (Integer)
-
+// Usamos sourceKey: 'uuid' e targetKey: 'uuid' para forçar JOIN via UUID
 Table.hasMany(TableSession, { as: 'history', foreignKey: 'tableId', sourceKey: 'uuid' });
 TableSession.belongsTo(Table, { foreignKey: 'tableId', targetKey: 'uuid' });
 
 // Relação para sessão ativa
 Table.belongsTo(TableSession, { as: 'activeSession', foreignKey: 'currentSessionId', constraints: false });
 
-// Notificações da Mesa (CORREÇÃO AQUI)
+// Notificações da Mesa
 Table.hasMany(Notification, { as: 'notifications', foreignKey: 'tableId', sourceKey: 'uuid' });
 Notification.belongsTo(Table, { foreignKey: 'tableId', targetKey: 'uuid' });
 
-// Avaliações da Mesa (CORREÇÃO AQUI)
+// Avaliações da Mesa
 Table.hasMany(Review, { foreignKey: 'tableId', sourceKey: 'uuid' });
 Review.belongsTo(Table, { foreignKey: 'tableId', targetKey: 'uuid' });
 
