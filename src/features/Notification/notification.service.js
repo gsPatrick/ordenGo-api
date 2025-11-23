@@ -217,7 +217,11 @@ exports.resolveNotification = async (restaurantId, notificationId) => {
   await notification.save();
 
   // Reverter status da mesa se necessário
-  const table = await Table.findByPk(notification.tableId);
+  // CORREÇÃO CRÍTICA: Busca por UUID, não por ID numérico
+  const table = await Table.findOne({ 
+    where: { uuid: notification.tableId } 
+  });
+
   if (table && ['calling', 'closing'].includes(table.status)) {
     // Se tem sessão aberta, volta para ocupada. Se não, volta para livre.
     if (table.currentSessionId) {
