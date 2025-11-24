@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Banner, SystemAd, Restaurant, Product } = require('../../models'); // Importar Product
+const { Banner, SystemAd, Restaurant, Product, Promotion } = require('../../models'); // <--- ADICIONADO Promotion AQUI
 const AppError = require('../../utils/AppError');
 
 // ============================================================
@@ -12,12 +12,23 @@ const AppError = require('../../utils/AppError');
 exports.createScreensaver = async (restaurantId, data) => {
   const imageUrl = `/uploads/${data.filename}`;
   
+  // Parse se vier como string
+  let title = data.title;
+  let description = data.description;
+  
+  if (typeof title === 'string') {
+    try { title = JSON.parse(title); } catch(e) { title = { pt: title }; }
+  }
+  if (typeof description === 'string') {
+    try { description = JSON.parse(description); } catch(e) { description = { pt: description }; }
+  }
+
   return await Banner.create({
     restaurantId,
     imageUrl,
-    title: data.title, 
-    description: data.description, // Novo
-    linkedProductId: data.linkedProductId || null, // Novo (UUID do produto)
+    title, 
+    description, 
+    linkedProductId: data.linkedProductId || null, 
     order: data.order || 0,
     isActive: true
   });
@@ -37,7 +48,7 @@ exports.getScreensavers = async (restaurantId, onlyActive = true) => {
         { 
             model: Product, 
             as: 'linkedProduct',
-            attributes: ['id', 'name', 'price', 'imageUrl'] // Dados para abrir o modal direto
+            attributes: ['id', 'name', 'price', 'imageUrl'] 
         }
     ]
   });
@@ -49,7 +60,6 @@ exports.getScreensavers = async (restaurantId, onlyActive = true) => {
 
   // 3. Se o restaurante existir, busca Ads Globais ou daquela UF
   if (restaurant) {
-    // Busca Ads que são Globais (targetState é NULL) OU da região do restaurante
     systemAds = await SystemAd.findAll({
       where: {
         isActive: true,
@@ -61,7 +71,7 @@ exports.getScreensavers = async (restaurantId, onlyActive = true) => {
       raw: true
     });
 
-    // Opcional: Incrementar visualização dos Ads (Async para não travar a resposta da API)
+    // Opcional: Incrementar visualização dos Ads (Async)
     if (systemAds.length > 0) {
       const adIds = systemAds.map(ad => ad.id);
       SystemAd.increment('viewsCount', { where: { id: adIds } }).catch(err => {
@@ -78,21 +88,21 @@ exports.getScreensavers = async (restaurantId, onlyActive = true) => {
     imageUrl: b.imageUrl,
     title: b.title, 
     description: b.description,
-    linkedProduct: b.linkedProduct, // O frontend verifica: se existir, clica e abre
+    linkedProduct: b.linkedProduct, 
     isAd: false,
-    linkUrl: b.actionLink
+    linkUrl: null
   }));
 
   // Formata Ads do Sistema (SuperAdmin)
   const formattedAds = systemAds.map(ad => ({
     id: ad.id,
     imageUrl: ad.imageUrl,
-    title: { pt: ad.title }, // Padroniza como objeto JSONB para manter consistência com o i18n
-    isAd: true, // Identificador para o frontend: É publicidade/Patrocinado
+    title: { pt: ad.title }, 
+    description: { pt: '' },
+    isAd: true, 
     linkUrl: ad.linkUrl
   }));
 
-  // Retorna misturado. O frontend decide a lógica de exibição (ex: alternar 1 a 1, ou mostrar Ads a cada 3 banners)
   return [...formattedInternal, ...formattedAds];
 };
 
@@ -117,8 +127,13 @@ exports.createPromotion = async (restaurantId, data) => {
     data.imageUrl = `/uploads/${data.filename}`;
   }
   
-  // O Controller já deve ter feito o JSON.parse de 'activeDays' e 'title' se vieram via form-data.
-  // data.activeDays deve ser array [0,1,5...]
+  // Parse manual se necessário
+  if (typeof data.title === 'string') {
+    try { data.title = JSON.parse(data.title); } catch(e) { data.title = { pt: data.title }; }
+  }
+  if (typeof data.activeDays === 'string') {
+    try { data.activeDays = JSON.parse(data.activeDays); } catch(e) { data.activeDays = []; }
+  }
 
   return await Promotion.create({ ...data, restaurantId });
 };
@@ -127,8 +142,6 @@ exports.createPromotion = async (restaurantId, data) => {
  * Lista Promoções Ativas do Restaurante
  */
 exports.getPromotions = async (restaurantId) => {
-  // Retorna todas as ativas. O frontend deve validar se o horário atual (Client Time)
-  // está dentro do range 'startTime' e 'endTime' e se o dia da semana bate com 'activeDays'.
   return await Promotion.findAll({
     where: { restaurantId, isActive: true }
   });
