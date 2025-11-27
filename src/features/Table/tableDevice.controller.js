@@ -1,5 +1,5 @@
 const tableDeviceService = require('./tableDevice.service');
-const catchAsync = require('../../../utils/catchAsync');
+const catchAsync = require('../../utils/catchAsync');
 const AppError = require('../../utils/AppError');
 
 // ============================================================
