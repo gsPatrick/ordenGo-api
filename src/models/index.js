@@ -21,6 +21,7 @@ const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const Notification = require('./Notification');
 const Review = require('./Review');
+const TableDevice = require('./TableDevice'); // <--- NOVO
 
 // ============================================================
 // DEFINIÇÃO DAS ASSOCIAÇÕES (RELATIONSHIPS)
@@ -104,6 +105,11 @@ Notification.belongsTo(Table, { foreignKey: 'tableId', targetKey: 'uuid' });
 Table.hasMany(Review, { foreignKey: 'tableId', sourceKey: 'uuid' });
 Review.belongsTo(Table, { foreignKey: 'tableId', targetKey: 'uuid' });
 
+// --- NOVO: Associação Mesa <-> Tablets ---
+// Uma mesa pode ter vários tablets conectados simultaneamente
+Table.hasMany(TableDevice, { as: 'devices', foreignKey: 'tableId', sourceKey: 'uuid' });
+TableDevice.belongsTo(Table, { foreignKey: 'tableId', targetKey: 'uuid' });
+
 
 // --- 4. Pedidos e Operação ---
 TableSession.hasMany(Order, { as: 'orders', foreignKey: 'tableSessionId' });
@@ -147,5 +153,6 @@ module.exports = {
   Order,
   OrderItem,
   Notification,
-  Review
+  Review,
+  TableDevice
 };
