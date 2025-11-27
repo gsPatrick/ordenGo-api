@@ -3,7 +3,7 @@ const superAdminController = require('./superAdmin.controller');
 const systemAdsController = require('./systemAds.controller'); 
 const regionRoutes = require('./region.routes'); // <--- Importação Nova
 const planRoutes = require('../Plan/plan.routes'); // <--- NOVA IMPORTAÇÃO (Caminho relativo para a pasta Plan)
-const advertiserRoutes = require('../AdNetwork/advertiser.routes'); // <--- NOVA IMPORTAÇÃO
+const advertiserRoutes = require('../AdNetwork/'); // <--- NOVA IMPORTAÇÃO
 const campaignRoutes = require('../AdNetwork/campaign.routes'); // <--- NOVA IMPORTAÇÃO
 const financeRoutes = require('../Finance/finance.routes'); // <--- NOVA IMPORTAÇÃO
 const analyticsRoutes = require('../Analytics/analytics.routes'); // <--- NOVA IMPORTAÇÃO
@@ -43,5 +43,6 @@ router.post('/ads', upload.single('image'), systemAdsController.createAd);
 router.delete('/ads/:id', systemAdsController.deleteAd);
 // 2. Gestão de Planos (SaaS Tiers) <--- NOVO
 router.use('/plans', planRoutes);
+router.post('/tenants/:id/impersonate', superAdminController.impersonateTenant);
 
 module.exports = router;

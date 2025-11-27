@@ -1,6 +1,6 @@
 const superAdminService = require('./superAdmin.service');
 const catchAsync = require('../../utils/catchAsync');
-
+const jwt = require('jsonwebtoken');
 exports.createRestaurant = catchAsync(async (req, res, next) => {
   // O body agora espera campos como planId, taxId, timezone, etc.
   const { restaurant, user, plan } = await superAdminService.createTenant(req.body);
@@ -55,5 +55,30 @@ exports.toggleStatus = catchAsync(async (req, res, next) => {
     data: {
       isActive: restaurant.isActive
     }
+  });
+});
+
+exports.impersonateTenant = catchAsync(async (req, res, next) => {
+  const { id } = req.params; // ID do Restaurante
+  
+  // Busca o gerente deste restaurante
+  const manager = await User.findOne({ 
+    where: { restaurantId: id, role: 'manager' } 
+  });
+
+  if (!manager) {
+    return next(new AppError('Este restaurante não possui um gerente ativo.', 404));
+  }
+
+  // Gera token como se fosse o gerente
+  const token = jwt.sign({ id: manager.id, role: manager.role, restaurantId: manager.restaurantId }, process.env.JWT_SECRET, {
+    expiresIn: '1h',
+  });
+
+  // Retorna token e dados para o frontend logar
+  res.status(200).json({
+    status: 'success',
+    token,
+    data: { user: manager }
   });
 });
