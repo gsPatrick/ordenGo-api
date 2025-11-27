@@ -1,7 +1,7 @@
 const express = require('express');
 const tableController = require('./table.controller');
 const tableDeviceController = require('./tableDevice.controller'); 
-const { protect, restrictTo } = require('../../../middlewares/authMiddleware');
+const { protect, restrictTo } = require('../../middlewares/authMiddleware');
 
 const router = express.Router();
 
