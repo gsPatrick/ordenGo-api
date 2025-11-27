@@ -1,4 +1,4 @@
-const { Table, TableDevice } = require('../../../models');
+const { Table, TableDevice } = require('../../models');
 const AppError = require('../../../utils/AppError');
 
 /**

@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { Table, TableSession, Restaurant, RestaurantConfig } = require('../../../models');
+const { Table, TableSession, Restaurant, RestaurantConfig } = require('../../models/index');
 const AppError = require('../../../utils/AppError');
 
 /**
