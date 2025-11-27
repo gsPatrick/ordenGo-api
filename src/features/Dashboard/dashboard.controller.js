@@ -23,3 +23,20 @@ exports.getSuperAdminDashboard = catchAsync(async (req, res, next) => {
     data
   });
 });
+
+exports.getAnalytics = catchAsync(async (req, res, next) => {
+  const { startDate, endDate, period } = req.query;
+  
+  if (!startDate || !endDate) {
+    return next(new AppError('Datas são obrigatórias', 400));
+  }
+
+  const data = await dashboardService.getAdvancedStats(
+    req.restaurantId, 
+    startDate, 
+    endDate, 
+    period // 'daily', 'weekly', etc
+  );
+
+  res.status(200).json({ status: 'success', data });
+});

@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const { 
-  Order, OrderItem, Product, Restaurant, User, Plan, sequelize 
+  Order, OrderItem, Product, Restaurant, User, Plan,Review, sequelize 
 } = require('../../models');
 
 // ============================================================
@@ -69,6 +69,116 @@ exports.getRestaurantStats = async (restaurantId, startDate, endDate) => {
       name: item.Product.name, // Agora acessível com segurança
       quantity: Number(item.getDataValue('soldQuantity')),
       revenue: Number(item.getDataValue('revenue'))
+    }))
+  };
+};
+
+exports.getAdvancedStats = async (restaurantId, startDate, endDate, periodType) => {
+  // 1. Definir Período Atual
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // 2. Definir Período Anterior (Para comparação)
+  const duration = end.getTime() - start.getTime();
+  const prevStart = new Date(start.getTime() - duration);
+  const prevEnd = new Date(end.getTime() - duration);
+
+  const currentFilter = {
+    restaurantId,
+    createdAt: { [Op.between]: [start, end] },
+    status: { [Op.not]: 'cancelled' }
+  };
+
+  const prevFilter = {
+    restaurantId,
+    createdAt: { [Op.between]: [prevStart, prevEnd] },
+    status: { [Op.not]: 'cancelled' }
+  };
+
+  // --- A. TOTAIS (Cards) ---
+  const currentSales = await Order.sum('total', { where: currentFilter }) || 0;
+  const prevSales = await Order.sum('total', { where: prevFilter }) || 0;
+  
+  const currentOrders = await Order.count({ where: currentFilter });
+  const prevOrders = await Order.count({ where: prevFilter });
+
+  // --- B. GRÁFICOS DE LINHA (Sales over time) ---
+  // Agrupamento depende do intervalo (se é 1 dia, agrupa por hora; se é mês, por dia)
+  let truncUnit = 'day';
+  if (periodType === 'daily') truncUnit = 'hour';
+  if (periodType === 'yearly') truncUnit = 'month';
+
+  const salesChart = await Order.findAll({
+    attributes: [
+      [sequelize.fn('date_trunc', truncUnit, sequelize.col('createdAt')), 'date'],
+      [sequelize.fn('SUM', sequelize.col('total')), 'total'],
+      [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+    ],
+    where: currentFilter,
+    group: [sequelize.fn('date_trunc', truncUnit, sequelize.col('createdAt'))],
+    order: [[sequelize.col('date'), 'ASC']],
+    raw: true
+  });
+
+  // --- C. FEEDBACK ---
+  const reviews = await Review.findAll({
+    where: { 
+      restaurantId,
+      createdAt: { [Op.between]: [start, end] }
+    },
+    attributes: ['ratingGlobal']
+  });
+  
+  const avgRating = reviews.length > 0 
+    ? (reviews.reduce((acc, r) => acc + r.ratingGlobal, 0) / reviews.length).toFixed(1) 
+    : 0;
+
+  // --- D. PRODUTOS MAIS VENDIDOS ---
+  const topProducts = await OrderItem.findAll({
+    attributes: [
+      'productId',
+      [sequelize.fn('SUM', sequelize.col('quantity')), 'soldQuantity']
+    ],
+    include: [
+      { 
+        model: Product, 
+        attributes: ['name'],
+        where: { restaurantId }
+      },
+      {
+        model: Order,
+        attributes: [],
+        where: currentFilter
+      }
+    ],
+    group: ['productId', 'Product.id', 'Product.name'],
+    order: [[sequelize.col('soldQuantity'), 'DESC']],
+    limit: 10
+  });
+
+  return {
+    cards: {
+      sales: { current: currentSales, previous: prevSales },
+      orders: { current: currentOrders, previous: prevOrders },
+      ticket: { 
+        current: currentOrders > 0 ? currentSales / currentOrders : 0,
+        previous: prevOrders > 0 ? prevSales / prevOrders : 0
+      }
+    },
+    charts: {
+      salesOverTime: salesChart.map(s => ({
+        label: s.date,
+        value: Number(s.total),
+        count: Number(s.count)
+      }))
+    },
+    feedback: {
+      average: avgRating,
+      total: reviews.length
+    },
+    ranking: topProducts.map(p => ({
+      name: p.Product.name,
+      quantity: Number(p.getDataValue('soldQuantity'))
     }))
   };
 };

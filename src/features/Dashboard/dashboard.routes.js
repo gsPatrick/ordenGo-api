@@ -23,4 +23,8 @@ router.get(
   dashboardController.getSuperAdminDashboard
 );
 
+router.get('/analytics', dashboardController.getAnalytics); // Nova rota
+
+
+
 module.exports = router;
