@@ -135,8 +135,8 @@ const PORT = process.env.PORT || 3000;
 sequelize.sync({ force: true }) 
   .then(async () => {
     console.log('💾 Banco de dados conectado e sincronizado.');
-    
     // Executa a verificação/criação do Admin
+    
     await createDefaultSuperAdmin();
 
     server.listen(PORT, () => {
