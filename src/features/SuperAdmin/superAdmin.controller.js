@@ -2,15 +2,18 @@ const superAdminService = require('./superAdmin.service');
 const catchAsync = require('../../utils/catchAsync');
 
 exports.createRestaurant = catchAsync(async (req, res, next) => {
-  const { restaurant, user } = await superAdminService.createTenant(req.body);
+  // O body agora espera campos como planId, taxId, timezone, etc.
+  const { restaurant, user, plan } = await superAdminService.createTenant(req.body);
 
   res.status(201).json({
     status: 'success',
-    message: 'Restaurante e Gerente criados com sucesso!',
+    message: 'Restaurante criado com sucesso!',
     data: {
       restaurantId: restaurant.id,
+      name: restaurant.name,
       managerEmail: user.email,
-      slug: restaurant.slug
+      plan: plan.name,
+      country: restaurant.country
     }
   });
 });
@@ -29,7 +32,22 @@ exports.listRestaurants = catchAsync(async (req, res, next) => {
 
 exports.toggleStatus = catchAsync(async (req, res, next) => {
   const { id } = req.params;
-  const restaurant = await superAdminService.toggleTenantStatus(id);
+  
+  // Busca o restaurante primeiro para inverter o status atual
+  // (Ou podemos receber o status desejado no body, aqui faremos toggle simples)
+  // Vamos adaptar o service para ser mais direto se necessário, mas vou usar a lógica de toggle do controller anterior
+  // Melhorando: O service que fiz acima chama-se updateTenantStatus e espera um booleano.
+  // Vamos buscar o status atual no controller para passar o inverso, ou usar o toggle do service anterior.
+  
+  // Para manter consistência com o código anterior, vou reusar a lógica de "toggle" no service
+  // Mas como reescrevi o service, vou implementar uma lógica de toggle rápida aqui:
+  
+  const { Restaurant } = require('../../models');
+  const restaurant = await Restaurant.findByPk(id);
+  if(!restaurant) return next(new AppError('Restaurante não encontrado', 404));
+  
+  restaurant.isActive = !restaurant.isActive;
+  await restaurant.save();
 
   res.status(200).json({
     status: 'success',

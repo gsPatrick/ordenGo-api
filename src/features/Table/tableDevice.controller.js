@@ -1,6 +1,6 @@
 const tableDeviceService = require('./tableDevice.service');
-const catchAsync = require('../../utils/catchAsync');
-const AppError = require('../../utils/AppError');
+const catchAsync = require('../../../utils/catchAsync');
+const AppError = require('../../../utils/AppError');
 
 // ============================================================
 // 1. VINCULAR (Tablet envia Código + UUID)

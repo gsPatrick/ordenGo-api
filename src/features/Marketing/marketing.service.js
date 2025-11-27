@@ -1,9 +1,17 @@
 const { Op } = require('sequelize');
-const { Banner, SystemAd, Restaurant, Product, Promotion } = require('../../models'); // <--- ADICIONADO Promotion AQUI
-const AppError = require('../../utils/AppError');
+const { 
+  Banner, 
+  Product, 
+  Promotion,
+  Campaign,
+  AdCreative,
+  Region,
+  Advertiser,
+  Restaurant
+} = require('../../models');
 
 // ============================================================
-// SCREENSAVERS (Banners & Ads)
+// SCREENSAVERS (Entrega de Ads + Banners Internos)
 // ============================================================
 
 /**
@@ -12,7 +20,6 @@ const AppError = require('../../utils/AppError');
 exports.createScreensaver = async (restaurantId, data) => {
   const imageUrl = `/uploads/${data.filename}`;
   
-  // Parse se vier como string
   let title = data.title;
   let description = data.description;
   
@@ -35,80 +42,101 @@ exports.createScreensaver = async (restaurantId, data) => {
 };
 
 /**
- * Busca Banners para o Tablet (Mistura Banners do Restaurante + Ads do Sistema)
+ * Busca Mix de Banners para o Tablet:
+ * 1. Banners Internos (Promoções do próprio restaurante)
+ * 2. Campanhas Publicitárias (Ad Network) filtradas por Região
  */
-exports.getScreensavers = async (restaurantId, onlyActive = true) => {
-  const where = { restaurantId };
-  if (onlyActive) where.isActive = true;
-
+exports.getScreensavers = async (restaurantId) => {
+  // 1. Buscar Banners Internos
   const internalBanners = await Banner.findAll({
-    where,
+    where: { restaurantId, isActive: true },
     order: [['order', 'ASC'], ['createdAt', 'DESC']],
-    include: [
-        { 
-            model: Product, 
-            as: 'linkedProduct',
-            attributes: ['id', 'name', 'price', 'imageUrl'] 
-        }
-    ]
+    include: [{ model: Product, as: 'linkedProduct', attributes: ['id', 'name', 'price', 'imageUrl'] }]
   });
 
-  // 2. Busca dados do Restaurante para saber a Região (Estado/UF)
-  const restaurant = await Restaurant.findByPk(restaurantId, { attributes: ['addressState'] });
+  // 2. Identificar Região do Restaurante
+  const restaurant = await Restaurant.findByPk(restaurantId, { attributes: ['regionId'] });
   
-  let systemAds = [];
+  let adCreatives = [];
 
-  // 3. Se o restaurante existir, busca Ads Globais ou daquela UF
+  // 3. Buscar Campanhas Ativas
+  // Regra: Status 'active', Dentro do prazo, e (Global OU Na Região do Restaurante)
   if (restaurant) {
-    systemAds = await SystemAd.findAll({
+    const now = new Date();
+    
+    const activeCampaigns = await Campaign.findAll({
       where: {
-        isActive: true,
-        [Op.or]: [
-          { targetState: null }, // Global
-          { targetState: restaurant.addressState } // Regional (ex: 'SP')
-        ]
+        status: 'active',
+        startDate: { [Op.lte]: now },
+        endDate: { [Op.gte]: now }
       },
-      raw: true
+      include: [
+        {
+          model: Region,
+          attributes: ['id'],
+          through: { attributes: [] }, // Tabela pivô
+          required: false // Left Join (permite campanhas sem região = Globais?)
+          // OBS: Se quiser forçar que campanhas globais não tenham região, a lógica muda.
+          // Aqui assumimos: Se a campanha tem regiões, o restaurante tem que estar em uma delas.
+          // Se a campanha não tem regiões, ela é global.
+        },
+        {
+          model: AdCreative,
+          as: 'creatives'
+        }
+      ]
     });
 
-    // Opcional: Incrementar visualização dos Ads (Async)
-    if (systemAds.length > 0) {
-      const adIds = systemAds.map(ad => ad.id);
-      SystemAd.increment('viewsCount', { where: { id: adIds } }).catch(err => {
-        console.error('Erro ao incrementar views dos ads:', err);
-      });
-    }
+    // Filtragem de Região em Memória (mais seguro para lógica Global vs Regional)
+    activeCampaigns.forEach(campaign => {
+      const campaignRegions = campaign.Regions.map(r => r.id);
+      const isGlobal = campaignRegions.length === 0;
+      const matchesRegion = restaurant.regionId && campaignRegions.includes(restaurant.regionId);
+
+      if (isGlobal || matchesRegion) {
+        // Adiciona os criativos dessa campanha à lista
+        campaign.creatives.forEach(creative => {
+          adCreatives.push({
+            ...creative.toJSON(),
+            campaignId: campaign.id,
+            priority: campaign.priority,
+            duration: campaign.duration
+          });
+        });
+      }
+    });
   }
 
-  // 4. Padroniza e mistura os arrays
-  
-  // Formata Banners Internos
+  // 4. Formatação Unificada
   const formattedInternal = internalBanners.map(b => ({
+    type: 'internal',
     id: b.id,
     imageUrl: b.imageUrl,
     title: b.title, 
     description: b.description,
     linkedProduct: b.linkedProduct, 
-    isAd: false,
-    linkUrl: null
+    duration: 10, // Duração padrão interno
+    campaignId: null,
+    creativeId: null
   }));
 
-  // Formata Ads do Sistema (SuperAdmin)
-  const formattedAds = systemAds.map(ad => ({
-    id: ad.id,
-    imageUrl: ad.imageUrl,
-    title: { pt: ad.title }, 
+  const formattedAds = adCreatives.map(ad => ({
+    type: 'ad',
+    id: ad.id, // Creative ID
+    imageUrl: ad.mediaUrl,
+    title: { pt: '' }, // Ads geralmente já tem texto na imagem
     description: { pt: '' },
-    isAd: true, 
-    linkUrl: ad.linkUrl
+    linkUrl: ad.linkUrl,
+    duration: ad.duration || 15,
+    campaignId: ad.campaignId, // CRÍTICO PARA TRACKING
+    creativeId: ad.id          // CRÍTICO PARA TRACKING
   }));
 
+  // Misturar ou priorizar Ads? 
+  // Por enquanto, retornamos tudo junto. O Frontend faz o "Shuffle" ou "Round Robin".
   return [...formattedInternal, ...formattedAds];
 };
 
-/**
- * Deleta um Banner interno
- */
 exports.deleteScreensaver = async (restaurantId, bannerId) => {
   const banner = await Banner.findOne({ where: { id: bannerId, restaurantId } });
   if (!banner) throw new AppError('Banner não encontrado', 404);
@@ -116,18 +144,12 @@ exports.deleteScreensaver = async (restaurantId, bannerId) => {
 };
 
 // ============================================================
-// PROMOÇÕES
+// PROMOÇÕES (Mantido igual)
 // ============================================================
 
-/**
- * Cria uma Promoção
- */
 exports.createPromotion = async (restaurantId, data) => {
-  if (data.filename) {
-    data.imageUrl = `/uploads/${data.filename}`;
-  }
+  if (data.filename) data.imageUrl = `/uploads/${data.filename}`;
   
-  // Parse manual se necessário
   if (typeof data.title === 'string') {
     try { data.title = JSON.parse(data.title); } catch(e) { data.title = { pt: data.title }; }
   }
@@ -138,18 +160,10 @@ exports.createPromotion = async (restaurantId, data) => {
   return await Promotion.create({ ...data, restaurantId });
 };
 
-/**
- * Lista Promoções Ativas do Restaurante
- */
 exports.getPromotions = async (restaurantId) => {
-  return await Promotion.findAll({
-    where: { restaurantId, isActive: true }
-  });
+  return await Promotion.findAll({ where: { restaurantId, isActive: true } });
 };
 
-/**
- * Ativa/Desativa uma Promoção rapidamente
- */
 exports.togglePromotion = async (restaurantId, promoId) => {
   const promo = await Promotion.findOne({ where: { id: promoId, restaurantId } });
   if (!promo) throw new AppError('Promoção não encontrada', 404);

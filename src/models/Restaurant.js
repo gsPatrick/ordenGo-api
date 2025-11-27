@@ -15,35 +15,66 @@ const Restaurant = sequelize.define('Restaurant', {
     type: DataTypes.STRING,
     unique: true,
   },
+  // Dados Fiscais Europeus
+  taxId: { // NIF, CIF, P.IVA, Steuernummer
+    type: DataTypes.STRING,
+  },
+  billingAddress: {
+    type: DataTypes.TEXT,
+  },
+  contactPerson: {
+    type: DataTypes.STRING,
+  },
+  // --- CRÍTICO PARA EUROPA ---
+  timezone: {
+    type: DataTypes.STRING, 
+    defaultValue: 'Europe/Madrid', // Ex: 'Europe/Berlin', 'Atlantic/Canary'
+    allowNull: false,
+  },
+  country: {
+    type: DataTypes.STRING(2), // ES, DE, IT, FR
+    defaultValue: 'ES',
+  },
+  // ---------------------------
+  
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
-  // --- NOVO CAMPO ---
   isOnboardingCompleted: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
-  // ------------------
-  planType: {
-    type: DataTypes.ENUM('basic', 'premium', 'enterprise'),
-    defaultValue: 'basic',
+  
+  planId: {
+    type: DataTypes.UUID,
+    allowNull: true,
   },
+  regionId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
+  
+  // Vigência do Contrato SaaS
+  contractStartDate: {
+    type: DataTypes.DATEONLY,
+  },
+  contractRenewalDate: {
+    type: DataTypes.DATEONLY,
+  },
+  autoRenew: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+  },
+  
   currency: {
     type: DataTypes.STRING(3),
-    defaultValue: 'BRL', 
-  },
-  addressCity: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  addressState: { 
-    type: DataTypes.STRING(2), 
-    allowNull: true,
+    defaultValue: 'EUR', // Padrão alterado para Euro
   },
   locales: {
     type: DataTypes.ARRAY(DataTypes.STRING), 
-    defaultValue: ['pt-BR'],
+    // Suporte aos idiomas principais
+    defaultValue: ['es-ES', 'en-US', 'de-DE', 'it-IT', 'fr-FR', 'pt-PT'],
   }
 });
 

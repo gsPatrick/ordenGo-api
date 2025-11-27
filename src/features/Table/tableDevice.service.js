@@ -1,5 +1,5 @@
-const { Table, TableDevice } = require('../../models');
-const AppError = require('../../utils/AppError');
+const { Table, TableDevice } = require('../../../models');
+const AppError = require('../../../utils/AppError');
 
 /**
  * Vincula Tablet via Código Manual

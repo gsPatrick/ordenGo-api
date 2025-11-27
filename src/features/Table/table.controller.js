@@ -1,5 +1,5 @@
 const tableService = require('./table.service');
-const catchAsync = require('../../utils/catchAsync');
+const catchAsync = require('../../../utils/catchAsync');
 
 // --- Rotas Administrativas (Gerente) ---
 

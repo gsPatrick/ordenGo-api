@@ -1,6 +1,6 @@
 const crypto = require('crypto');
-const { Table, TableSession, Restaurant, RestaurantConfig } = require('../../models');
-const AppError = require('../../utils/AppError');
+const { Table, TableSession, Restaurant, RestaurantConfig } = require('../../../models');
+const AppError = require('../../../utils/AppError');
 
 /**
  * Cria uma nova mesa e gera seu Token QR Code único
