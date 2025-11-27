@@ -1,6 +1,13 @@
 const superAdminService = require('./superAdmin.service');
 const catchAsync = require('../../utils/catchAsync');
 const jwt = require('jsonwebtoken');
+
+const bcrypt = require('bcryptjs');
+const { 
+  sequelize, 
+  User, 
+} = require('../../models');
+
 exports.createRestaurant = catchAsync(async (req, res, next) => {
   // O body agora espera campos como planId, taxId, timezone, etc.
   const { restaurant, user, plan } = await superAdminService.createTenant(req.body);
