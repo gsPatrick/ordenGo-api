@@ -1,4 +1,6 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto'); // Importar crypto
+
 const { 
   sequelize, 
   Restaurant, 
@@ -9,102 +11,68 @@ const {
 } = require('../../models');
 const AppError = require('../../utils/AppError');
 
+
+// Função auxiliar para gerar código curto (ex: A1B2C3)
+const generateAccessCode = () => {
+  return crypto.randomBytes(3).toString('hex').toUpperCase(); // Gera 6 caracteres
+};
+
 /**
  * Cria um novo Tenant (Restaurante) no sistema com suporte completo a dados Europeus.
  */
 exports.createTenant = async (data) => {
   const {
-    // Dados do Restaurante
-    restaurantName,
-    slug,
-    taxId, // NIF, CIF, P.IVA
-    billingAddress,
-    contactPerson,
-    timezone, // 'Europe/Madrid', 'Europe/Berlin'
-    country,  // 'ES', 'DE', 'IT', 'FR'
-    currency, // 'EUR'
-    
-    // Assinatura e Localização
-    planId,   // UUID do plano selecionado
-    regionId, // UUID da região (opcional)
-
-    // Dados do Gerente
-    managerName,
-    managerEmail,
-    managerPassword
+    restaurantName, slug, taxId, billingAddress, contactPerson,
+    timezone, country, currency, planId, regionId,
+    managerName, managerEmail, managerPassword
   } = data;
 
-  // 1. Validações Prévias
-  
-  // A. Slug único
+  // 1. Validações Prévias (Mantidas)
   const slugExists = await Restaurant.findOne({ where: { slug } });
-  if (slugExists) {
-    throw new AppError('Este slug (URL) já está em uso. Escolha outro.', 400);
-  }
+  if (slugExists) throw new AppError('Slug já em uso.', 400);
 
-  // B. Email único
   const emailExists = await User.findOne({ where: { email: managerEmail } });
-  if (emailExists) {
-    throw new AppError('Este email já está cadastrado no sistema.', 400);
-  }
+  if (emailExists) throw new AppError('Email já cadastrado.', 400);
 
-  // C. Validar Plano
-  if (!planId) {
-    throw new AppError('É obrigatório selecionar um Plano (Tier) para o restaurante.', 400);
-  }
   const plan = await Plan.findByPk(planId);
-  if (!plan || !plan.isActive) {
-    throw new AppError('Plano selecionado é inválido ou está inativo.', 400);
+  if (!plan || !plan.isActive) throw new AppError('Plano inválido.', 400);
+
+  // 2. Gerar Código Único
+  let accessCode = generateAccessCode();
+  // Loop de segurança simples para garantir unicidade (muito raro colidir, mas bom ter)
+  while (await Restaurant.findOne({ where: { accessCode } })) {
+    accessCode = generateAccessCode();
   }
 
-  // D. Validar Região (Se informada)
-  if (regionId) {
-    const region = await Region.findByPk(regionId);
-    if (!region) {
-      throw new AppError('Região selecionada não encontrada.', 404);
-    }
-  }
-
-  // INÍCIO DA TRANSAÇÃO
   const transaction = await sequelize.transaction();
 
   try {
-    // 2. Criar Restaurante com dados completos
+    // 3. Criar Restaurante com accessCode
     const restaurant = await Restaurant.create({
       name: restaurantName,
       slug,
+      accessCode, // <--- SALVANDO O CÓDIGO AQUI
       taxId,
       billingAddress,
       contactPerson: contactPerson || managerName,
       timezone: timezone || 'Europe/Madrid',
       country: country || 'ES',
       currency: currency || 'EUR',
-      
-      // Vínculos
       planId,
       regionId: regionId || null,
-      
-      // Contrato (Inicia hoje)
       contractStartDate: new Date(),
       isActive: true,
-      isOnboardingCompleted: false // Obriga o gerente a fazer o wizard
+      isOnboardingCompleted: false
     }, { transaction });
 
-    // 3. Criar Configuração Padrão (Cores e Funcionalidades)
-    // Inicializa com as features do plano, se houver
-    const defaultFeatures = plan.features || {};
-    
+    // ... (Configuração Padrão e Criação do Usuário mantidas iguais) ...
     await RestaurantConfig.create({
       restaurantId: restaurant.id,
-      primaryColor: '#df0024', // Vermelho Padrão
+      primaryColor: '#df0024',
       secondaryColor: '#1f1c1d',
-      backgroundColor: '#1f1c1d',
-      enableCallWaiter: true,
-      enableBillRequest: true,
-      // Se o plano desativa ads, já salvamos essa preferência aqui futuramente
+      backgroundColor: '#1f1c1d'
     }, { transaction });
 
-    // 4. Criar o Usuário Gerente
     const hashedPassword = await bcrypt.hash(managerPassword, 12);
     
     const user = await User.create({

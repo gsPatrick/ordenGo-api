@@ -71,6 +71,13 @@ const Restaurant = sequelize.define('Restaurant', {
     type: DataTypes.STRING(3),
     defaultValue: 'EUR', // Padrão alterado para Euro
   },
+    // --- NOVO CAMPO: CÓDIGO DE ACESSO RÁPIDO ---
+  accessCode: {
+    type: DataTypes.STRING(10),
+    unique: true,
+    allowNull: true, // Pode ser null se criado via script antigo, mas idealmente preenchido
+    comment: 'Código curto para o cliente baixar/configurar os PWAs'
+  },
   locales: {
     type: DataTypes.ARRAY(DataTypes.STRING), 
     // Suporte aos idiomas principais
