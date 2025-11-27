@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const { 
-  Order, OrderItem, Product, Restaurant, User, sequelize 
+  Order, OrderItem, Product, Restaurant, User, Plan, sequelize 
 } = require('../../models');
 
 // ============================================================
@@ -8,23 +8,19 @@ const {
 // ============================================================
 
 exports.getRestaurantStats = async (restaurantId, startDate, endDate) => {
-  // Filtro de data básico (se não vier, pega as últimas 24h)
   const start = startDate ? new Date(startDate) : new Date(new Date().setHours(0,0,0,0));
   const end = endDate ? new Date(endDate) : new Date(new Date().setHours(23,59,59,999));
 
   const dateFilter = {
     restaurantId,
     createdAt: { [Op.between]: [start, end] },
-    status: { [Op.not]: 'cancelled' } // Ignora cancelados
+    status: { [Op.not]: 'cancelled' }
   };
 
-  // A. Cards de Resumo (Total Vendido, Qtde Pedidos, Ticket Médio)
   const totalSales = await Order.sum('total', { where: dateFilter }) || 0;
   const totalOrders = await Order.count({ where: dateFilter });
   const averageTicket = totalOrders > 0 ? (totalSales / totalOrders).toFixed(2) : 0;
 
-  // B. Gráfico: Vendas por Hora (Para identificar picos)
-  // Usamos funcão do Postgres: date_trunc('hour', ...)
   const salesByHour = await Order.findAll({
     attributes: [
       [sequelize.fn('date_trunc', 'hour', sequelize.col('createdAt')), 'hour'],
@@ -37,7 +33,6 @@ exports.getRestaurantStats = async (restaurantId, startDate, endDate) => {
     raw: true
   });
 
-  // C. Ranking: Top 5 Produtos Mais Vendidos
   const topProducts = await OrderItem.findAll({
     attributes: [
       'productId',
@@ -48,34 +43,30 @@ exports.getRestaurantStats = async (restaurantId, startDate, endDate) => {
       { 
         model: Product, 
         attributes: ['name'],
-        where: { restaurantId } // Garante segurança
+        where: { restaurantId }
       },
       {
         model: Order,
         attributes: [],
-        where: dateFilter // Aplica o filtro de data nos itens tbm
+        where: dateFilter
       }
     ],
-    group: ['productId', 'Product.id'],
+    group: ['productId', 'Product.id', 'Product.name'], // Group by corrigido para Postgres
     order: [[sequelize.col('soldQuantity'), 'DESC']],
     limit: 5
   });
 
   return {
-    summary: {
-      totalSales,
-      totalOrders,
-      averageTicket
-    },
+    summary: { totalSales, totalOrders, averageTicket },
     charts: {
       salesByHour: salesByHour.map(item => ({
-        hour: item.hour, // Frontend formata isso (ex: "14:00")
+        hour: item.hour,
         total: Number(item.total),
         count: Number(item.count)
       }))
     },
     ranking: topProducts.map(item => ({
-      name: item.Product.name,
+      name: item.Product.name, // Agora acessível com segurança
       quantity: Number(item.getDataValue('soldQuantity')),
       revenue: Number(item.getDataValue('revenue'))
     }))
@@ -88,19 +79,31 @@ exports.getRestaurantStats = async (restaurantId, startDate, endDate) => {
 // ============================================================
 
 exports.getSaaSStats = async () => {
-  // A. Métricas de Crescimento (Total de Tenants)
+  // A. Métricas de Crescimento
   const totalRestaurants = await Restaurant.count();
   const activeRestaurants = await Restaurant.count({ where: { isActive: true } });
 
-  // B. Distribuição de Planos
+  // B. Distribuição de Planos (CORRIGIDO: Usa a tabela Plan)
   const planDistribution = await Restaurant.findAll({
-    attributes: ['planType', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
-    group: ['planType'],
+    attributes: [
+      [sequelize.fn('COUNT', sequelize.col('Restaurant.id')), 'count']
+    ],
+    include: [{
+      model: Plan,
+      attributes: ['name']
+    }],
+    group: ['Plan.id', 'Plan.name'],
     raw: true
   });
 
-  // C. Volume Transacionado Global (GMV) - Opcional, pode ser pesado
-  // Soma de todas as ordens de todos os restaurantes
+  // Formata o resultado para { 'Basic': 10, 'Premium': 5 }
+  const formattedPlans = {};
+  planDistribution.forEach(item => {
+    const planName = item['Plan.name'] || 'Sem Plano';
+    formattedPlans[planName] = Number(item.count);
+  });
+
+  // C. Volume Transacionado Global (GMV)
   const globalGMV = await Order.sum('total', {
     where: { status: { [Op.not]: 'cancelled' } }
   });
@@ -125,9 +128,6 @@ exports.getSaaSStats = async () => {
     financial: {
       globalGMV: globalGMV || 0
     },
-    plans: planDistribution.reduce((acc, item) => {
-      acc[item.planType] = Number(item.count);
-      return acc;
-    }, {})
+    plans: formattedPlans
   };
 };

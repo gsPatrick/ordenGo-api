@@ -31,7 +31,7 @@ const resolveAuthOrTableToken = async (req, res, next) => {
 // ============================================================
 // ROTA HÍBRIDA (Leitura)
 // ============================================================
-// Agora aceita tanto o Gerente (JWT) quanto o Tablet (x-table-token)
+// Agora aceita tanto o Gerente/Admin (JWT) quanto o Tablet (x-table-token)
 router.get('/', resolveAuthOrTableToken, restaurantController.getSettings);
 
 // Rota Pública Explícita (caso queira usar via ID na URL)
@@ -42,11 +42,13 @@ router.get('/public/:restaurantId', (req, res, next) => {
 
 
 // ============================================================
-// ROTAS ESTRITAMENTE PROTEGIDAS (Escrita - Apenas Gerente)
+// ROTAS ESTRITAMENTE PROTEGIDAS (Escrita - Apenas Gerente/Admin)
 // ============================================================
-// Daqui para baixo, exigimos login REAL de gerente, pois Tablet não pode editar configurações
+// Daqui para baixo, exigimos login REAL.
+// CORREÇÃO: Adicionado 'superadmin' para permitir que você edite configurações.
+
 router.use(protect); 
-router.use(restrictTo('manager', 'admin'));
+router.use(restrictTo('manager', 'admin', 'superadmin')); 
 
 // Configuração do Multer para múltiplos campos
 const appearanceUpload = upload.fields([
@@ -64,6 +66,7 @@ router.patch('/', upload.any(), async (req, res, next) => {
     return restaurantController.updateGeneral(req, res, next);
 });
 
-router.post('/onboarding/complete', restrictTo('manager', 'admin'), restaurantController.finalizeOnboarding);
+// Finalizar Onboarding
+router.post('/onboarding/complete', restaurantController.finalizeOnboarding);
 
 module.exports = router;
