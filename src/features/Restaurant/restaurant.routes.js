@@ -54,7 +54,8 @@ router.use(restrictTo('manager', 'admin', 'superadmin'));
 const appearanceUpload = upload.fields([
   { name: 'institutionalBanners', maxCount: 10 },
   { name: 'highlightImagesLarge', maxCount: 5 },
-  { name: 'highlightImagesSmall', maxCount: 2 }
+  { name: 'highlightImagesSmall', maxCount: 2 },
+  { name: 'logo', maxCount: 1 }
 ]);
 
 router.patch('/appearance', appearanceUpload, restaurantController.updateAppearance);

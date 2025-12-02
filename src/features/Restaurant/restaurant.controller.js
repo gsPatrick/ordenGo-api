@@ -33,12 +33,15 @@ exports.updateAppearance = catchAsync(async (req, res, next) => {
     if (req.files.highlightImagesSmall) {
       data.highlightImagesSmall = mapFiles(req.files.highlightImagesSmall);
     }
+    if (req.files.logo) {
+      data.logoUrl = `/uploads/${req.files.logo[0].filename}`;
+    }
   }
 
   // Parse de JSONs vindos do FormData (Se o frontend enviar stringificado)
   ['publicTitle', 'aboutTitle', 'aboutText', 'ourHistory'].forEach(field => {
     if (data[field] && typeof data[field] === 'string') {
-      try { data[field] = JSON.parse(data[field]); } catch(e) {}
+      try { data[field] = JSON.parse(data[field]); } catch (e) { }
     }
   });
 

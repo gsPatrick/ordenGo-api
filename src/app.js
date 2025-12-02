@@ -38,7 +38,7 @@ io.on('connection', (socket) => {
       const room = `restaurant_${data.restaurantId}`;
       socket.join(room);
       console.log(`👨‍🍳 Socket ${socket.id} entrou na sala: ${room}`);
-    } 
+    }
     else if (data.type === 'table') {
       const room = `table_${data.tableId}`;
       socket.join(room);
@@ -89,7 +89,7 @@ async function createDefaultSuperAdmin() {
 
     // 2. Verifica/Cria o Restaurante "HQ" (SaaS Admin precisa estar vinculado a algo)
     let hq = await Restaurant.findOne({ where: { slug: 'ordengo-admin' } });
-    
+
     if (!hq) {
       hq = await Restaurant.create({
         name: 'OrdenGo HQ',
@@ -132,11 +132,11 @@ async function createDefaultSuperAdmin() {
 // ============================================================
 const PORT = process.env.PORT || 3000;
 
-sequelize.sync({ force: true }) 
+sequelize.sync({ force: false })
   .then(async () => {
     console.log('💾 Banco de dados conectado e sincronizado.');
     // Executa a verificação/criação do Admin
-    
+
     await createDefaultSuperAdmin();
 
     server.listen(PORT, () => {

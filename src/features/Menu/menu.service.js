@@ -1,5 +1,5 @@
-const { 
-  Category, Product, ProductVariant, ModifierGroup, Modifier, sequelize 
+const {
+  Category, Product, ProductVariant, ModifierGroup, Modifier, sequelize
 } = require('../../models');
 const AppError = require('../../utils/AppError');
 
@@ -28,8 +28,8 @@ exports.getProducts = async (restaurantId, filters = {}) => {
  */
 exports.getFullMenu = async (restaurantId) => {
   const menu = await Category.findAll({
-    where: { 
-      restaurantId, 
+    where: {
+      restaurantId,
       parentId: null, // Apenas categorias raiz
       isActive: true
     },
@@ -48,8 +48,8 @@ exports.getFullMenu = async (restaurantId) => {
             required: false,
             include: [
               { model: ProductVariant, as: 'variants' },
-              { 
-                model: ModifierGroup, 
+              {
+                model: ModifierGroup,
                 as: 'modifierGroups',
                 include: [{ model: Modifier, as: 'options' }]
               }
@@ -63,8 +63,8 @@ exports.getFullMenu = async (restaurantId) => {
         required: false,
         include: [
           { model: ProductVariant, as: 'variants' },
-          { 
-            model: ModifierGroup, 
+          {
+            model: ModifierGroup,
             as: 'modifierGroups',
             include: [{ model: Modifier, as: 'options' }]
           }
@@ -88,7 +88,7 @@ exports.createCategory = async (restaurantId, data) => {
 exports.updateCategory = async (restaurantId, id, data) => {
   const category = await Category.findOne({ where: { id, restaurantId } });
   if (!category) throw new AppError('Categoria não encontrada', 404);
-  
+
   // Se vier imagem nova (filename), atualizamos o path
   if (data.filename) {
     data.image = `/uploads/${data.filename}`;
@@ -103,7 +103,7 @@ exports.updateCategory = async (restaurantId, id, data) => {
 
 exports.createProduct = async (restaurantId, data) => {
   const { variants, modifierGroupIds, ...productData } = data;
-  
+
   // Transação pois podemos criar variantes junto
   const transaction = await sequelize.transaction();
 
@@ -194,4 +194,58 @@ exports.getAllModifierGroups = async (restaurantId) => {
     where: { restaurantId },
     include: [{ model: Modifier, as: 'options' }]
   });
+};
+
+exports.updateModifierGroup = async (restaurantId, id, data) => {
+  const group = await ModifierGroup.findOne({ where: { id, restaurantId } });
+  if (!group) throw new AppError('Grupo de modificadores não encontrado', 404);
+
+  const { options, ...groupData } = data;
+
+  const transaction = await sequelize.transaction();
+  try {
+    await group.update(groupData, { transaction });
+
+    if (options) {
+      // Substituição completa das opções (simples)
+      // Primeiro remove as antigas
+      await Modifier.destroy({ where: { modifierGroupId: id }, transaction });
+
+      // Cria as novas
+      if (options.length > 0) {
+        const optionsData = options.map(o => ({ ...o, modifierGroupId: id }));
+        await Modifier.bulkCreate(optionsData, { transaction });
+      }
+    }
+
+    await transaction.commit();
+    return group;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+};
+
+exports.deleteModifierGroup = async (restaurantId, id) => {
+  const group = await ModifierGroup.findOne({ where: { id, restaurantId } });
+  if (!group) throw new AppError('Grupo de modificadores não encontrado', 404);
+
+  await group.destroy();
+  return true;
+};
+
+exports.deleteCategory = async (restaurantId, id) => {
+  const category = await Category.findOne({ where: { id, restaurantId } });
+  if (!category) throw new AppError('Categoria não encontrada', 404);
+
+  await category.destroy();
+  return true;
+};
+
+exports.deleteProduct = async (restaurantId, id) => {
+  const product = await Product.findOne({ where: { id, restaurantId } });
+  if (!product) throw new AppError('Produto não encontrado', 404);
+
+  await product.destroy();
+  return true;
 };

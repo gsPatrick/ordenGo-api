@@ -84,7 +84,7 @@ exports.listProducts = catchAsync(async (req, res, next) => {
   };
 
   const products = await menuService.getProducts(req.restaurantId, filters);
-  
+
   res.status(200).json({ status: 'success', results: products.length, data: { products } });
 });
 
@@ -145,7 +145,7 @@ exports.toggleAvailability = catchAsync(async (req, res, next) => {
 // ============================================================
 exports.createModifierGroup = catchAsync(async (req, res, next) => {
   const data = { ...req.body };
-  
+
   // Parse do nome (i18n) e das opções
   data.name = safeParse(data.name);
   if (data.options) data.options = safeParse(data.options);
@@ -157,4 +157,28 @@ exports.createModifierGroup = catchAsync(async (req, res, next) => {
 exports.listModifiers = catchAsync(async (req, res, next) => {
   const groups = await menuService.getAllModifierGroups(req.restaurantId);
   res.status(200).json({ status: 'success', data: { groups } });
+});
+
+exports.updateModifierGroup = catchAsync(async (req, res, next) => {
+  const data = { ...req.body };
+  data.name = safeParse(data.name);
+  if (data.options) data.options = safeParse(data.options);
+
+  const group = await menuService.updateModifierGroup(req.restaurantId, req.params.id, data);
+  res.status(200).json({ status: 'success', data: { group } });
+});
+
+exports.deleteModifierGroup = catchAsync(async (req, res, next) => {
+  await menuService.deleteModifierGroup(req.restaurantId, req.params.id);
+  res.status(204).json({ status: 'success', data: null });
+});
+
+exports.deleteCategory = catchAsync(async (req, res, next) => {
+  await menuService.deleteCategory(req.restaurantId, req.params.id);
+  res.status(204).json({ status: 'success', data: null });
+});
+
+exports.deleteProduct = catchAsync(async (req, res, next) => {
+  await menuService.deleteProduct(req.restaurantId, req.params.id);
+  res.status(204).json({ status: 'success', data: null });
 });
