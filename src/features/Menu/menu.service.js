@@ -26,7 +26,9 @@ exports.getProducts = async (restaurantId, filters = {}) => {
  * Retorna a Árvore Completa do Menu para o Tablet/Frontend.
  * Estrutura: Categorias Principais -> Subcategorias -> Produtos (com Variantes e Modificadores)
  */
-exports.getFullMenu = async (restaurantId) => {
+exports.getFullMenu = async (restaurantId, includeUnavailable = false) => {
+  const productWhere = includeUnavailable ? {} : { isAvailable: true };
+
   const menu = await Category.findAll({
     where: {
       restaurantId,
@@ -44,7 +46,7 @@ exports.getFullMenu = async (restaurantId) => {
         include: [
           {
             model: Product,
-            where: { isAvailable: true }, // Opcional: Se quiser esconder indisponíveis
+            where: productWhere,
             required: false,
             include: [
               { model: ProductVariant, as: 'variants' },
@@ -60,6 +62,7 @@ exports.getFullMenu = async (restaurantId) => {
       {
         // Produtos que estão direto na categoria raiz (sem subcategoria)
         model: Product,
+        where: productWhere,
         required: false,
         include: [
           { model: ProductVariant, as: 'variants' },

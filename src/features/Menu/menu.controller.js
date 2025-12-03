@@ -20,7 +20,8 @@ const safeParse = (value) => {
 exports.getMenu = catchAsync(async (req, res, next) => {
   // Se for acesso público (Tablet), o restaurantId pode vir injetado manualmente no req
   // Se for acesso logado, vem do token
-  const menu = await menuService.getFullMenu(req.restaurantId);
+  const includeUnavailable = req.query.includeUnavailable === 'true';
+  const menu = await menuService.getFullMenu(req.restaurantId, includeUnavailable);
   res.status(200).json({ status: 'success', data: { menu } });
 });
 
