@@ -7,9 +7,9 @@ const AppError = require('../../utils/AppError');
  */
 exports.getRestaurantSettings = async (restaurantId) => {
   const restaurant = await Restaurant.findByPk(restaurantId, {
-    include: [{ 
-      model: RestaurantConfig, 
-      as: 'config' 
+    include: [{
+      model: RestaurantConfig,
+      as: 'config'
     }]
   });
 
@@ -37,7 +37,14 @@ exports.updateConfig = async (restaurantId, data) => {
     'primaryColor', 'secondaryColor', 'backgroundColor',
     'aboutTitle', 'aboutText',
     'wifiSsid', 'wifiPassword',
-    'enableCallWaiter', 'enableBillRequest'
+    'enableCallWaiter', 'enableBillRequest',
+    // Added fields for appearance settings
+    'logoUrl',
+    'institutionalBanners',
+    'highlightImagesLarge',
+    'highlightImagesSmall',
+    'publicTitle',
+    'ourHistory'
   ];
 
   allowedFields.forEach(field => {
@@ -68,7 +75,7 @@ exports.updateGeneralInfo = async (restaurantId, data) => {
  */
 exports.updateLogo = async (restaurantId, filename) => {
   const config = await RestaurantConfig.findOne({ where: { restaurantId } });
-  
+
   // Constrói a URL relativa (frontend deve adicionar o dominio base)
   config.logoUrl = `/uploads/${filename}`;
   await config.save();
