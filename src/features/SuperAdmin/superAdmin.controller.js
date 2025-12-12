@@ -72,7 +72,7 @@ exports.impersonateTenant = catchAsync(async (req, res, next) => {
   const token = jwt.sign(
     { id: manager.id, role: manager.role, restaurantId: manager.restaurantId },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '3d' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
   );
 
   res.status(200).json({
@@ -107,6 +107,16 @@ exports.uploadDocument = catchAsync(async (req, res, next) => {
   if (!req.file) return next(new AppError('No file uploaded', 400));
   const document = await superAdminService.addDocument(req.params.id, req.file, req.body.type);
   res.status(201).json({ status: 'success', data: { document } });
+});
+
+exports.updateDocument = catchAsync(async (req, res, next) => {
+  const document = await superAdminService.updateDocument(req.params.id, req.params.docId, req.body);
+  res.status(200).json({ status: 'success', data: { document } });
+});
+
+exports.payDocument = catchAsync(async (req, res, next) => {
+  const document = await superAdminService.payDocument(req.params.id, req.params.docId);
+  res.status(200).json({ status: 'success', data: { document } });
 });
 
 exports.deleteDocument = catchAsync(async (req, res, next) => {
