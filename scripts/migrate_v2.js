@@ -52,9 +52,45 @@ async function migrate() {
             }
         }
 
-        // 5. Create TableSessions table
+        // 5. Create TableSessions table (if not exists)
         await TableSession.sync();
         console.log('✅ Synced TableSession table.');
+
+        // 6. Ensure TableSessions columns exist (in case table existed but was empty/old)
+        const tableSessionColumns = [
+            { name: 'sessionToken', type: 'VARCHAR(255)' },
+            { name: 'clientName', type: 'VARCHAR(255)' },
+            { name: 'openedAt', type: 'TIMESTAMP WITH TIME ZONE DEFAULT NOW()' },
+            { name: 'closedAt', type: 'TIMESTAMP WITH TIME ZONE' },
+            { name: 'totalAmount', type: 'DECIMAL(10, 2) DEFAULT 0.00' },
+            { name: 'paymentMethod', type: 'VARCHAR(255)' },
+        ];
+
+        for (const col of tableSessionColumns) {
+            try {
+                await sequelize.query(`ALTER TABLE "TableSessions" ADD COLUMN "${col.name}" ${col.type};`);
+                console.log(`✅ Added "${col.name}" column to TableSessions.`);
+            } catch (error) {
+                if (error.original && error.original.code === '42701') {
+                    console.log(`ℹ️ "${col.name}" column already exists in TableSessions.`);
+                } else {
+                    console.error(`❌ Error adding "${col.name}" to TableSessions:`, error.message);
+                }
+            }
+        }
+
+        // 7. Handle 'status' column (ENUM/VARCHAR)
+        try {
+            // Using VARCHAR for safety and compatibility if ENUM type issues arise
+            await sequelize.query(`ALTER TABLE "TableSessions" ADD COLUMN "status" VARCHAR(255) DEFAULT 'open';`);
+            console.log('✅ Added "status" column to TableSessions.');
+        } catch (error) {
+            if (error.original && error.original.code === '42701') {
+                console.log('ℹ️ "status" column already exists in TableSessions.');
+            } else {
+                console.error('❌ Error adding "status" to TableSessions:', error.message);
+            }
+        }
 
         console.log('✨ Migration completed successfully.');
         process.exit(0);
