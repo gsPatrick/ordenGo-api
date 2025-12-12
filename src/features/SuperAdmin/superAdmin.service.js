@@ -188,6 +188,31 @@ exports.removeDocument = async (restaurantId, docId) => {
   await doc.destroy();
 };
 
+exports.updateDocument = async (restaurantId, docId, data) => {
+  const doc = await RestaurantDocument.findOne({ where: { id: docId, restaurantId } });
+  if (!doc) throw new AppError('Documento não encontrado.', 404);
+
+  // Update allowed fields
+  if (data.name) doc.name = data.name;
+  if (data.type) doc.type = data.type;
+  if (data.amount !== undefined) doc.amount = data.amount;
+  if (data.dueDate !== undefined) doc.dueDate = data.dueDate;
+  if (data.description !== undefined) doc.description = data.description;
+  if (data.status) doc.status = data.status;
+
+  await doc.save();
+  return doc;
+};
+
+exports.payDocument = async (restaurantId, docId) => {
+  const doc = await RestaurantDocument.findOne({ where: { id: docId, restaurantId } });
+  if (!doc) throw new AppError('Documento não encontrado.', 404);
+
+  doc.status = 'paid';
+  await doc.save();
+  return doc;
+};
+
 // --- NOTES ---
 exports.getNotes = async (restaurantId) => {
   return await RestaurantNote.findAll({

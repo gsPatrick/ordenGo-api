@@ -32,6 +32,8 @@ router.patch('/tenants/:id/toggle-status', superAdminController.toggleStatus);
 // Documentos
 router.get('/tenants/:id/documents', superAdminController.listDocuments);
 router.post('/tenants/:id/documents', upload.single('file'), superAdminController.uploadDocument);
+router.put('/tenants/:id/documents/:docId', superAdminController.updateDocument);
+router.patch('/tenants/:id/documents/:docId/pay', superAdminController.payDocument);
 router.delete('/tenants/:id/documents/:docId', superAdminController.deleteDocument);
 
 // Notas

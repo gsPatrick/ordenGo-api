@@ -23,6 +23,22 @@ const RestaurantDocument = sequelize.define('RestaurantDocument', {
         type: DataTypes.STRING, // 'contract', 'other'
         defaultValue: 'other',
     },
+    status: {
+        type: DataTypes.ENUM('pending', 'paid', 'cancelled'),
+        defaultValue: 'pending',
+    },
+    amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+    },
+    dueDate: {
+        type: DataTypes.DATEONLY,
+        allowNull: true,
+    },
+    description: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
     uploadedAt: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
