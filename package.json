@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node scripts/migrate_v2.js && node src/app.js",
+    "dev": "node scripts/migrate_v2.js && nodemon src/app.js",
     "migrate": "node scripts/migrate_v2.js"
   },
   "keywords": [],
