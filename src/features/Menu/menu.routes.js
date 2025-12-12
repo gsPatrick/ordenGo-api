@@ -40,12 +40,14 @@ router.use(restrictTo('manager', 'admin'));
 router.post('/categories', categoryUpload, menuController.createCategory);
 router.patch('/categories/:id', categoryUpload, menuController.updateCategory);
 router.delete('/categories/:id', menuController.deleteCategory);
+router.patch('/categories/reorder', menuController.reorderCategories);
 
 // Produtos
 router.post('/products', upload.single('image'), menuController.createProduct);
 router.patch('/products/:id', upload.single('image'), menuController.updateProduct);
 router.delete('/products/:id', menuController.deleteProduct);
 router.patch('/products/:id/availability', menuController.toggleAvailability); // "86 it" rápido
+router.patch('/products/reorder', menuController.reorderProducts);
 
 // Modificadores (Escrita)
 router.post('/modifiers', menuController.createModifierGroup);

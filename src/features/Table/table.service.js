@@ -16,7 +16,7 @@ exports.createTable = async (restaurantId, data) => {
 
   // 2. Gerar um Token Único para o QR Code
   // Este token fará parte da URL: https://app.ordengo.com/t/{qrCodeToken}
-  const token = crypto.randomBytes(8).toString('hex'); 
+  const token = crypto.randomBytes(8).toString('hex');
 
   const table = await Table.create({
     restaurantId,
@@ -37,10 +37,10 @@ exports.getAllTables = async (restaurantId) => {
     order: [['number', 'ASC']], // Ou ordenar por ID
     // Opcional: Incluir sessão ativa para saber detalhes (quem está sentado)
     include: [
-      { 
-        model: TableSession, 
+      {
+        model: TableSession,
         as: 'activeSession',
-        required: false 
+        required: false
       }
     ]
   });
@@ -52,9 +52,9 @@ exports.getAllTables = async (restaurantId) => {
  */
 exports.deleteTable = async (restaurantId, tableId) => {
   const table = await Table.findOne({ where: { id: tableId, restaurantId } });
-  
+
   if (!table) throw new AppError('Mesa não encontrada.', 404);
-  
+
   // Regra de negócio: Não deletar mesa se estiver ocupada (sessão aberta)
   if (table.status !== 'free' && table.currentSessionId) {
     throw new AppError('Não é possível deletar uma mesa que está ocupada ou com sessão aberta.', 400);
@@ -96,7 +96,7 @@ exports.updateStatus = async (restaurantId, tableId, status) => {
   if (!table) throw new AppError('Mesa não encontrada.', 404);
 
   table.status = status;
-  
+
   // Se forçar "Livre", removemos o vínculo da sessão atual por segurança
   if (status === 'free') {
     table.currentSessionId = null;
@@ -117,6 +117,11 @@ exports.connectDeviceToTable = async (token, deviceInfo) => {
         model: Restaurant,
         attributes: ['id', 'name', 'currency', 'locales'],
         include: [{ model: RestaurantConfig, as: 'config' }]
+      },
+      {
+        model: TableSession,
+        as: 'activeSession',
+        required: false
       }
     ]
   });
@@ -131,7 +136,7 @@ exports.connectDeviceToTable = async (token, deviceInfo) => {
   table.deviceAgent = deviceInfo.userAgent;
   // table.deviceLocation = deviceInfo.location; // Seria preenchido se usasse geoip-lite
   table.isDeviceConnected = true;
-  
+
   await table.save();
 
   return table;
@@ -142,15 +147,15 @@ exports.connectDeviceToTable = async (token, deviceInfo) => {
  */
 exports.disconnectDevice = async (restaurantId, tableUuid) => {
   const table = await Table.findOne({ where: { uuid: tableUuid, restaurantId } });
-  
+
   if (!table) throw new AppError('Mesa não encontrada.', 404);
 
   table.deviceConnectedAt = null;
   table.deviceIp = null;
   table.deviceAgent = null;
   table.isDeviceConnected = false;
-  
+
   await table.save();
-  
+
   return table;
 };

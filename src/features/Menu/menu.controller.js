@@ -183,3 +183,15 @@ exports.deleteProduct = catchAsync(async (req, res, next) => {
   await menuService.deleteProduct(req.restaurantId, req.params.id);
   res.status(204).json({ status: 'success', data: null });
 });
+
+exports.reorderCategories = catchAsync(async (req, res, next) => {
+  const { orderedIds } = req.body;
+  await menuService.reorderCategories(req.restaurantId, orderedIds);
+  res.status(200).json({ status: 'success', message: 'Categorias reordenadas.' });
+});
+
+exports.reorderProducts = catchAsync(async (req, res, next) => {
+  const { orderedIds } = req.body;
+  await menuService.reorderProducts(req.restaurantId, orderedIds);
+  res.status(200).json({ status: 'success', message: 'Produtos reordenados.' });
+});

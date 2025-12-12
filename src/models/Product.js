@@ -51,6 +51,10 @@ const Product = sequelize.define('Product', {
   hasVariants: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
+  },
+  order: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
   }
 });
 
