@@ -6,11 +6,9 @@ async function migrate() {
 
         // 1. Add 'order' column to Categories
         try {
-            // Check if column exists first to avoid error or just catch it
             await sequelize.query(`ALTER TABLE "Categories" ADD COLUMN "order" INTEGER DEFAULT 0;`);
             console.log('✅ Added "order" column to Categories.');
         } catch (error) {
-            // Postgres error 42701: duplicate_column
             if (error.original && error.original.code === '42701') {
                 console.log('ℹ️ "order" column already exists in Categories.');
             } else {
@@ -30,9 +28,31 @@ async function migrate() {
             }
         }
 
-        // 3. Create TableSessions table
-        // TableSession.sync() creates the table if it doesn't exist (and does nothing if it does, unless alter/force is passed)
-        // This is safe for existing databases as long as we don't pass force: true
+        // 3. Add 'accessCode' column to Restaurants
+        try {
+            await sequelize.query(`ALTER TABLE "Restaurants" ADD COLUMN "accessCode" VARCHAR(10);`);
+            console.log('✅ Added "accessCode" column to Restaurants.');
+        } catch (error) {
+            if (error.original && error.original.code === '42701') {
+                console.log('ℹ️ "accessCode" column already exists in Restaurants.');
+            } else {
+                console.error('❌ Error adding "accessCode" column to Restaurants:', error.message);
+            }
+        }
+
+        // 4. Add UNIQUE constraint to accessCode
+        try {
+            await sequelize.query(`ALTER TABLE "Restaurants" ADD CONSTRAINT "Restaurants_accessCode_key" UNIQUE ("accessCode");`);
+            console.log('✅ Added UNIQUE constraint to accessCode.');
+        } catch (error) {
+            if (error.original && error.original.code === '42710') { // duplicate_object (constraint)
+                console.log('ℹ️ UNIQUE constraint already exists on accessCode.');
+            } else {
+                console.error('❌ Error adding UNIQUE constraint to accessCode:', error.message);
+            }
+        }
+
+        // 5. Create TableSessions table
         await TableSession.sync();
         console.log('✅ Synced TableSession table.');
 
