@@ -82,6 +82,12 @@ exports.impersonateTenant = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.getRestaurant = catchAsync(async (req, res, next) => {
+  const restaurant = await superAdminService.getTenantById(req.params.id);
+  if (!restaurant) return next(new AppError('Restaurante não encontrado', 404));
+  res.status(200).json({ status: 'success', data: { restaurant } });
+});
+
 exports.updateRestaurant = catchAsync(async (req, res, next) => {
   const restaurant = await superAdminService.updateTenant(req.params.id, req.body);
   res.status(200).json({ status: 'success', data: { restaurant } });
