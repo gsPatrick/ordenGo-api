@@ -48,6 +48,7 @@ exports.getFullMenu = async (restaurantId, includeUnavailable = false) => {
             model: Product,
             where: productWhere,
             required: false,
+            order: [['order', 'ASC']],
             include: [
               { model: ProductVariant, as: 'variants' },
               {
@@ -64,6 +65,7 @@ exports.getFullMenu = async (restaurantId, includeUnavailable = false) => {
         model: Product,
         where: productWhere,
         required: false,
+        order: [['order', 'ASC']],
         include: [
           { model: ProductVariant, as: 'variants' },
           {
