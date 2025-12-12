@@ -107,3 +107,19 @@ exports.deleteDocument = catchAsync(async (req, res, next) => {
   await superAdminService.removeDocument(req.params.id, req.params.docId);
   res.status(204).json({ status: 'success', data: null });
 });
+
+// --- NOTES ---
+exports.listNotes = catchAsync(async (req, res) => {
+  const notes = await superAdminService.getNotes(req.params.id);
+  res.json({ status: 'success', data: { notes } });
+});
+
+exports.createNote = catchAsync(async (req, res) => {
+  const note = await superAdminService.addNote(req.params.id, req.body.content, 'Super Admin');
+  res.status(201).json({ status: 'success', data: { note } });
+});
+
+exports.deleteNote = catchAsync(async (req, res) => {
+  await superAdminService.deleteNote(req.params.id, req.params.noteId);
+  res.status(204).send();
+});

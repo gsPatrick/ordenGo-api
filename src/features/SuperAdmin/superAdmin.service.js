@@ -1,5 +1,7 @@
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto'); // Importar crypto
+const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
 
 const {
   sequelize,
@@ -8,7 +10,8 @@ const {
   User,
   Plan,
   Region,
-  RestaurantDocument
+  RestaurantDocument,
+  RestaurantNote
 } = require('../../models');
 const AppError = require('../../utils/AppError');
 
@@ -121,6 +124,16 @@ exports.getAllTenants = async () => {
   return restaurants;
 };
 
+exports.getTenantById = async (id) => {
+  return await Restaurant.findByPk(id, {
+    include: [
+      { model: Plan },
+      { model: Region },
+      { model: User, where: { role: 'manager' }, required: false }
+    ]
+  });
+};
+
 /**
  * Bloqueia/Desbloqueia e atualiza dados rápidos
  */
@@ -165,5 +178,34 @@ exports.addDocument = async (restaurantId, file, type) => {
 exports.removeDocument = async (restaurantId, docId) => {
   const doc = await RestaurantDocument.findOne({ where: { id: docId, restaurantId } });
   if (!doc) throw new AppError('Documento não encontrado.', 404);
+
+  // Opcional: Deletar arquivo físico
+  const filePath = path.join(__dirname, '../../../public', doc.url);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+
   await doc.destroy();
+};
+
+// --- NOTES ---
+exports.getNotes = async (restaurantId) => {
+  return await RestaurantNote.findAll({
+    where: { restaurantId },
+    order: [['createdAt', 'DESC']]
+  });
+};
+
+exports.addNote = async (restaurantId, content, createdBy) => {
+  return await RestaurantNote.create({
+    restaurantId,
+    content,
+    createdBy
+  });
+};
+
+exports.deleteNote = async (restaurantId, noteId) => {
+  const note = await RestaurantNote.findOne({ where: { id: noteId, restaurantId } });
+  if (!note) throw new AppError('Nota não encontrada.', 404);
+  await note.destroy();
 };

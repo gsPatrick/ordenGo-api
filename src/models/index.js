@@ -22,6 +22,7 @@ const LedgerEntry = require('./LedgerEntry');
 const Restaurant = require('./Restaurant');
 const RestaurantConfig = require('./RestaurantConfig');
 const RestaurantDocument = require('./RestaurantDocument');
+const RestaurantNote = require('./RestaurantNote');
 const PushSubscription = require('./PushSubscription');
 const Table = require('./Table');
 const TableSession = require('./TableSession');
@@ -72,6 +73,10 @@ RestaurantConfig.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 // Documentos
 Restaurant.hasMany(RestaurantDocument, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
 RestaurantDocument.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
+// Notas (Notes)
+Restaurant.hasMany(RestaurantNote, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
+RestaurantNote.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
 // Equipe
 Restaurant.hasMany(User, { foreignKey: 'restaurantId' });
@@ -238,6 +243,7 @@ module.exports = {
   Restaurant,
   RestaurantConfig,
   RestaurantDocument,
+  RestaurantNote,
   PushSubscription,
   Table,
   TableSession,
