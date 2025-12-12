@@ -1,13 +1,14 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto'); // Importar crypto
 
-const { 
-  sequelize, 
-  Restaurant, 
-  RestaurantConfig, 
-  User, 
-  Plan, 
-  Region 
+const {
+  sequelize,
+  Restaurant,
+  RestaurantConfig,
+  User,
+  Plan,
+  Region,
+  RestaurantDocument
 } = require('../../models');
 const AppError = require('../../utils/AppError');
 
@@ -74,13 +75,13 @@ exports.createTenant = async (data) => {
     }, { transaction });
 
     const hashedPassword = await bcrypt.hash(managerPassword, 12);
-    
+
     const user = await User.create({
       restaurantId: restaurant.id,
       name: managerName,
       email: managerEmail,
       password: hashedPassword,
-      role: 'manager', 
+      role: 'manager',
     }, { transaction });
 
     await transaction.commit();
@@ -89,7 +90,7 @@ exports.createTenant = async (data) => {
 
   } catch (error) {
     await transaction.rollback();
-    throw error; 
+    throw error;
   }
 };
 
@@ -99,11 +100,11 @@ exports.createTenant = async (data) => {
 exports.getAllTenants = async () => {
   const restaurants = await Restaurant.findAll({
     include: [
-      { 
-        model: User, 
+      {
+        model: User,
         where: { role: 'manager' },
         attributes: ['name', 'email'],
-        limit: 1 
+        limit: 1
       },
       {
         model: Plan,
@@ -116,7 +117,7 @@ exports.getAllTenants = async () => {
     ],
     order: [['createdAt', 'DESC']]
   });
-  
+
   return restaurants;
 };
 
@@ -131,4 +132,38 @@ exports.updateTenantStatus = async (restaurantId, isActive) => {
   await restaurant.save();
 
   return restaurant;
+};
+
+exports.updateTenant = async (id, data) => {
+  const restaurant = await Restaurant.findByPk(id);
+  if (!restaurant) throw new AppError('Restaurante não encontrado.', 404);
+  await restaurant.update(data);
+  return restaurant;
+};
+
+exports.deleteTenant = async (id) => {
+  const restaurant = await Restaurant.findByPk(id);
+  if (!restaurant) throw new AppError('Restaurante não encontrado.', 404);
+  await restaurant.destroy();
+};
+
+exports.getDocuments = async (restaurantId) => {
+  return await RestaurantDocument.findAll({ where: { restaurantId } });
+};
+
+exports.addDocument = async (restaurantId, file, type) => {
+  const url = '/uploads/' + file.filename;
+
+  return await RestaurantDocument.create({
+    restaurantId,
+    name: file.originalname,
+    url,
+    type: type || 'other'
+  });
+};
+
+exports.removeDocument = async (restaurantId, docId) => {
+  const doc = await RestaurantDocument.findOne({ where: { id: docId, restaurantId } });
+  if (!doc) throw new AppError('Documento não encontrado.', 404);
+  await doc.destroy();
 };

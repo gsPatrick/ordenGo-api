@@ -21,7 +21,8 @@ const LedgerEntry = require('./LedgerEntry');
 // --- Tenant (Restaurante) ---
 const Restaurant = require('./Restaurant');
 const RestaurantConfig = require('./RestaurantConfig');
-const PushSubscription = require('./PushSubscription'); 
+const RestaurantDocument = require('./RestaurantDocument');
+const PushSubscription = require('./PushSubscription');
 const Table = require('./Table');
 const TableSession = require('./TableSession');
 const TableDevice = require('./TableDevice');
@@ -36,7 +37,7 @@ const ModifierGroup = require('./ModifierGroup');
 const Modifier = require('./Modifier');
 
 // --- Marketing Interno (Restaurante) ---
-const Banner = require('./Banner'); 
+const Banner = require('./Banner');
 const Promotion = require('./Promotion');
 
 // --- Rede de Publicidade (Ad Network) ---
@@ -67,6 +68,10 @@ Restaurant.belongsTo(Region, { foreignKey: 'regionId' });
 // Configurações Visuais
 Restaurant.hasOne(RestaurantConfig, { foreignKey: 'restaurantId', as: 'config', onDelete: 'CASCADE' });
 RestaurantConfig.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
+// Documentos
+Restaurant.hasMany(RestaurantDocument, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
+RestaurantDocument.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
 // Equipe
 Restaurant.hasMany(User, { foreignKey: 'restaurantId' });
@@ -219,41 +224,42 @@ module.exports = {
   User,
   SystemSetting,
   AuditLog,
-  
+
   // SaaS Business
   Plan,
   Region,
   ExchangeRate,
-  
+
   // Financeiro
   Invoice,
   LedgerEntry,
-  
+
   // Tenant Models
   Restaurant,
   RestaurantConfig,
+  RestaurantDocument,
   PushSubscription,
   Table,
   TableSession,
   TableDevice,
   Notification,
   Review,
-  
+
   // Menu Models
   Category,
   Product,
   ProductVariant,
   ModifierGroup,
   Modifier,
-  
+
   // Order Models
   Order,
   OrderItem,
-  
+
   // Marketing Interno
   Banner,
   Promotion,
-  
+
   // Ad Network
   Advertiser,
   Campaign,

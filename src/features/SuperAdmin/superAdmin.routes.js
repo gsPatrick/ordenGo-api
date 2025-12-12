@@ -1,6 +1,6 @@
 const express = require('express');
 const superAdminController = require('./superAdmin.controller');
-const systemAdsController = require('./systemAds.controller'); 
+const systemAdsController = require('./systemAds.controller');
 const regionRoutes = require('./region.routes'); // <--- Importação Nova
 const planRoutes = require('../Plan/plan.routes'); // <--- NOVA IMPORTAÇÃO (Caminho relativo para a pasta Plan)
 const advertiserRoutes = require('../AdNetwork/advertiser.routes'); // <--- NOVA IMPORTAÇÃO
@@ -27,7 +27,7 @@ router.use('/advertisers', advertiserRoutes);
 router.use('/campaigns', campaignRoutes); // <--- NOVO BLOCO
 // 4. Finanças e Contabilidade <--- NOVO BLOCO
 router.use('/finance', financeRoutes);
- //Analytics e Relatórios <--- NOVO BLOCO
+//Analytics e Relatórios <--- NOVO BLOCO
 router.use('/analytics', analyticsRoutes);
 // 6. Configurações e Auditoria <--- NOVO BLOCO
 router.use('/settings', settingsRoutes);
@@ -36,6 +36,13 @@ router.use('/settings', settingsRoutes);
 router.get('/tenants', superAdminController.listRestaurants);
 router.post('/tenants', superAdminController.createRestaurant);
 router.patch('/tenants/:id/toggle-status', superAdminController.toggleStatus);
+
+router.put('/tenants/:id', superAdminController.updateRestaurant);
+router.delete('/tenants/:id', superAdminController.deleteRestaurant);
+
+router.get('/tenants/:id/documents', superAdminController.listDocuments);
+router.post('/tenants/:id/documents', upload.single('file'), superAdminController.uploadDocument);
+router.delete('/tenants/:id/documents/:docId', superAdminController.deleteDocument);
 
 // 3. Ads Legados (Se ainda estiver usando o systemAds antigo, manter por compatibilidade)
 router.get('/ads', systemAdsController.listAds);

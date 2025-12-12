@@ -1,4 +1,4 @@
-const { sequelize, TableSession } = require('../src/models');
+const { sequelize, TableSession, RestaurantDocument } = require('../src/models');
 
 async function migrate() {
     try {
@@ -90,6 +90,12 @@ async function migrate() {
             } else {
                 console.error('❌ Error adding "status" to TableSessions:', error.message);
             }
+        }
+
+        // 8. Sync RestaurantDocument table
+        if (RestaurantDocument) {
+            await RestaurantDocument.sync({ alter: true });
+            console.log('✅ Synced RestaurantDocument table.');
         }
 
         console.log('✨ Migration completed successfully.');
