@@ -7,6 +7,8 @@ const bcrypt = require('bcryptjs');
 const {
   sequelize,
   User,
+  Restaurant,
+  RestaurantConfig
 } = require('../../models');
 
 exports.createRestaurant = catchAsync(async (req, res, next) => {
@@ -41,7 +43,6 @@ exports.listRestaurants = catchAsync(async (req, res, next) => {
 exports.toggleStatus = catchAsync(async (req, res, next) => {
   const { id } = req.params;
 
-  const { Restaurant } = require('../../models');
   const restaurant = await Restaurant.findByPk(id);
   if (!restaurant) return next(new AppError('Restaurante não encontrado', 404));
 
@@ -61,7 +62,12 @@ exports.impersonateTenant = catchAsync(async (req, res, next) => {
   const { id } = req.params; // ID do Restaurante
 
   const manager = await User.findOne({
-    where: { restaurantId: id, role: 'manager' }
+    where: { restaurantId: id, role: 'manager' },
+    include: [{
+      model: Restaurant,
+      required: true,
+      include: [{ model: RestaurantConfig, as: 'config', attributes: ['logoUrl'] }]
+    }]
   });
 
   if (!manager) {
@@ -75,10 +81,16 @@ exports.impersonateTenant = catchAsync(async (req, res, next) => {
     { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
   );
 
+  const userJSON = manager.toJSON();
+  if (userJSON.Restaurant && userJSON.Restaurant.config) {
+    userJSON.Restaurant.logo = userJSON.Restaurant.config.logoUrl;
+    delete userJSON.Restaurant.config;
+  }
+
   res.status(200).json({
     status: 'success',
     token,
-    data: { user: manager }
+    data: { user: userJSON }
   });
 });
 

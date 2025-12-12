@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { User, Restaurant } = require('../../models');
+const { User, Restaurant, RestaurantConfig } = require('../../models');
 const AppError = require('../../utils/AppError');
 const { validate: isUuid } = require('uuid');
 
@@ -24,7 +24,12 @@ exports.loginUser = async (email, password) => {
 
   const user = await User.findOne({
     where: { email },
-    include: [{ model: Restaurant, required: true, attributes: ['id', 'isActive', 'isOnboardingCompleted', 'slug'] }]
+    include: [{
+      model: Restaurant,
+      required: true,
+      attributes: ['id', 'isActive', 'isOnboardingCompleted', 'slug'],
+      include: [{ model: RestaurantConfig, as: 'config', attributes: ['logoUrl'] }]
+    }]
   });
 
   if (!user || !(await bcrypt.compare(password, user.password))) {
@@ -36,9 +41,16 @@ exports.loginUser = async (email, password) => {
   }
 
   const token = signToken(user.id, user.role, user.restaurantId);
-  user.password = undefined;
 
-  return { user, token };
+  // Map logoUrl to Restaurant.logo for frontend compatibility
+  const userJSON = user.toJSON();
+  if (userJSON.Restaurant && userJSON.Restaurant.config) {
+    userJSON.Restaurant.logo = userJSON.Restaurant.config.logoUrl;
+    delete userJSON.Restaurant.config;
+  }
+  delete userJSON.password;
+
+  return { user: userJSON, token };
 };
 
 exports.loginWaiterWithPin = async (pin, restaurantIdentifier) => {
@@ -63,7 +75,13 @@ exports.loginWaiterWithPin = async (pin, restaurantIdentifier) => {
       pin,
       restaurantId: targetRestaurantId,
       role: 'waiter'
-    }
+    },
+    include: [{
+      model: Restaurant,
+      required: true,
+      attributes: ['id', 'isActive', 'isOnboardingCompleted', 'slug'],
+      include: [{ model: RestaurantConfig, as: 'config', attributes: ['logoUrl'] }]
+    }]
   });
 
   if (!user) {
@@ -72,7 +90,13 @@ exports.loginWaiterWithPin = async (pin, restaurantIdentifier) => {
 
   // Garçons também herdam a expiração de 30 dias (útil para tablets)
   const token = signToken(user.id, user.role, user.restaurantId);
-  user.password = undefined;
 
-  return { user, token };
+  const userJSON = user.toJSON();
+  if (userJSON.Restaurant && userJSON.Restaurant.config) {
+    userJSON.Restaurant.logo = userJSON.Restaurant.config.logoUrl;
+    delete userJSON.Restaurant.config;
+  }
+  delete userJSON.password;
+
+  return { user: userJSON, token };
 };
