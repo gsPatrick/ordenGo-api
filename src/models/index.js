@@ -40,6 +40,7 @@ const Modifier = require('./Modifier');
 // --- Marketing Interno (Restaurante) ---
 const Banner = require('./Banner');
 const Promotion = require('./Promotion');
+const ClientAd = require('./ClientAd'); // Novo Screensaver
 
 // --- Rede de Publicidade (Ad Network) ---
 const Advertiser = require('./Advertiser');
@@ -176,7 +177,12 @@ Banner.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 Banner.belongsTo(Product, { foreignKey: 'linkedProductId', as: 'linkedProduct' });
 
 Restaurant.hasMany(Promotion, { foreignKey: 'restaurantId' });
+Restaurant.hasMany(Promotion, { foreignKey: 'restaurantId' });
 Promotion.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
+// Screensaver Ads (Client)
+Restaurant.hasMany(ClientAd, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
+ClientAd.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
 
 // --- 2.7. Ad Network (Publicidade Global) ---
@@ -264,7 +270,9 @@ module.exports = {
 
   // Marketing Interno
   Banner,
+  Banner,
   Promotion,
+  ClientAd,
 
   // Ad Network
   Advertiser,

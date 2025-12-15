@@ -66,6 +66,7 @@ exports.impersonateTenant = catchAsync(async (req, res, next) => {
     include: [{
       model: Restaurant,
       required: true,
+      attributes: ['id', 'name', 'isActive', 'isOnboardingCompleted', 'slug'],
       include: [{ model: RestaurantConfig, as: 'config', attributes: ['logoUrl'] }]
     }]
   });

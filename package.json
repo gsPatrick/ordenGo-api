@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node scripts/migrate_v2.js && node src/app.js",
-    "dev": "node scripts/migrate_v2.js && nodemon src/app.js",
-    "migrate": "node scripts/migrate_v2.js"
+    "start": "node scripts/migrate_v2.js && node scripts/migrate_v3_screensaver.js && node scripts/migrate_v4_product_gallery.js && node src/app.js",
+    "dev": "node scripts/migrate_v2.js && node scripts/migrate_v3_screensaver.js && node scripts/migrate_v4_product_gallery.js && nodemon src/app.js",
+    "migrate": "node scripts/migrate.js && node scripts/migrate_v2.js && node scripts/migrate_v3_screensaver.js && node scripts/migrate_v4_product_gallery.js",
+    "migrate:v4": "node scripts/migrate_v4_product_gallery.js"
   },
   "keywords": [],
   "author": "",

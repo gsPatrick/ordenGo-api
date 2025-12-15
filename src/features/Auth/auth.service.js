@@ -27,7 +27,7 @@ exports.loginUser = async (email, password) => {
     include: [{
       model: Restaurant,
       required: true,
-      attributes: ['id', 'isActive', 'isOnboardingCompleted', 'slug'],
+      attributes: ['id', 'name', 'isActive', 'isOnboardingCompleted', 'slug'],
       include: [{ model: RestaurantConfig, as: 'config', attributes: ['logoUrl'] }]
     }]
   });
@@ -79,7 +79,7 @@ exports.loginWaiterWithPin = async (pin, restaurantIdentifier) => {
     include: [{
       model: Restaurant,
       required: true,
-      attributes: ['id', 'isActive', 'isOnboardingCompleted', 'slug'],
+      attributes: ['id', 'name', 'isActive', 'isOnboardingCompleted', 'slug'],
       include: [{ model: RestaurantConfig, as: 'config', attributes: ['logoUrl'] }]
     }]
   });
