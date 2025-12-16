@@ -1,4 +1,4 @@
-const { SystemAd, ClientAd, RestaurantConfig, Region } = require('../models');
+const { SystemAd, ClientAd, RestaurantConfig, Region } = require('../../models');
 const { Op } = require('sequelize');
 
 exports.getScreensaverPlaylist = async (restaurantId, userRegionId) => {
