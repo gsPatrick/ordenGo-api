@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const screensaverController = require('./screensaver.controller');
-const { protect } = require('../Auth/auth.controller');
+const { protect } = require('../../middlewares/authMiddleware');
 
 // Public (Tablet fetches playlist)
 router.get('/:restaurantId', screensaverController.getPlaylist);
