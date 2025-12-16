@@ -16,7 +16,7 @@ exports.createRestaurant = catchAsync(async (req, res, next) => {
 
   res.status(201).json({
     status: 'success',
-    message: 'Restaurante criado com sucesso!',
+    message: '¡Restaurante creado con éxito!',
     data: {
       restaurantId: restaurant.id,
       name: restaurant.name,
@@ -44,14 +44,14 @@ exports.toggleStatus = catchAsync(async (req, res, next) => {
   const { id } = req.params;
 
   const restaurant = await Restaurant.findByPk(id);
-  if (!restaurant) return next(new AppError('Restaurante não encontrado', 404));
+  if (!restaurant) return next(new AppError('Restaurante no encontrado', 404));
 
   restaurant.isActive = !restaurant.isActive;
   await restaurant.save();
 
   res.status(200).json({
     status: 'success',
-    message: `Restaurante ${restaurant.isActive ? 'ativado' : 'bloqueado'} com sucesso.`,
+    message: `Restaurante ${restaurant.isActive ? 'activado' : 'bloqueado'} con éxito.`,
     data: {
       isActive: restaurant.isActive
     }
@@ -72,7 +72,7 @@ exports.impersonateTenant = catchAsync(async (req, res, next) => {
   });
 
   if (!manager) {
-    return next(new AppError('Este restaurante não possui um gerente ativo.', 404));
+    return next(new AppError('Este restaurante no tiene un gerente activo.', 404));
   }
 
   // ALTERAÇÃO: Removido '1h' hardcoded. Agora usa a config global ou 3d.
@@ -97,7 +97,7 @@ exports.impersonateTenant = catchAsync(async (req, res, next) => {
 
 exports.getRestaurant = catchAsync(async (req, res, next) => {
   const restaurant = await superAdminService.getTenantById(req.params.id);
-  if (!restaurant) return next(new AppError('Restaurante não encontrado', 404));
+  if (!restaurant) return next(new AppError('Restaurante no encontrado', 404));
   res.status(200).json({ status: 'success', data: { restaurant } });
 });
 

@@ -28,22 +28,23 @@ exports.createTenant = async (data) => {
   const {
     restaurantName, slug, taxId, billingAddress, contactPerson,
     timezone, country, currency, planId, regionId,
-    managerName, managerEmail, managerPassword
+    managerName, managerEmail, managerPassword,
+    // Configurações de Screensaver (Opcionais)
+    screensaverIdleTime, screensaverAdminBatchSize, screensaverClientBatchSize
   } = data;
 
   // 1. Validações Prévias (Mantidas)
   const slugExists = await Restaurant.findOne({ where: { slug } });
-  if (slugExists) throw new AppError('Slug já em uso.', 400);
+  if (slugExists) throw new AppError('Slug ya en uso.', 400);
 
   const emailExists = await User.findOne({ where: { email: managerEmail } });
-  if (emailExists) throw new AppError('Email já cadastrado.', 400);
+  if (emailExists) throw new AppError('Email ya registrado.', 400);
 
   const plan = await Plan.findByPk(planId);
-  if (!plan || !plan.isActive) throw new AppError('Plano inválido.', 400);
+  if (!plan || !plan.isActive) throw new AppError('Plan inválido.', 400);
 
   // 2. Gerar Código Único
   let accessCode = generateAccessCode();
-  // Loop de segurança simples para garantir unicidade (muito raro colidir, mas bom ter)
   while (await Restaurant.findOne({ where: { accessCode } })) {
     accessCode = generateAccessCode();
   }
@@ -51,11 +52,11 @@ exports.createTenant = async (data) => {
   const transaction = await sequelize.transaction();
 
   try {
-    // 3. Criar Restaurante com accessCode
+    // 3. Criar Restaurante
     const restaurant = await Restaurant.create({
       name: restaurantName,
       slug,
-      accessCode, // <--- SALVANDO O CÓDIGO AQUI
+      accessCode,
       taxId,
       billingAddress,
       contactPerson: contactPerson || managerName,
@@ -65,16 +66,19 @@ exports.createTenant = async (data) => {
       planId,
       regionId: regionId || null,
       contractStartDate: new Date(),
-      isActive: true,
+      isActive: true, // Default active
       isOnboardingCompleted: false
     }, { transaction });
 
-    // ... (Configuração Padrão e Criação do Usuário mantidas iguais) ...
+    // 4. Configuração Padrão + Screensaver
     await RestaurantConfig.create({
       restaurantId: restaurant.id,
       primaryColor: '#df0024',
       secondaryColor: '#1f1c1d',
-      backgroundColor: '#1f1c1d'
+      backgroundColor: '#1f1c1d',
+      screensaverIdleTime: screensaverIdleTime || 120,
+      screensaverAdminBatchSize: screensaverAdminBatchSize || 3,
+      screensaverClientBatchSize: screensaverClientBatchSize || 1
     }, { transaction });
 
     const hashedPassword = await bcrypt.hash(managerPassword, 12);
@@ -98,7 +102,7 @@ exports.createTenant = async (data) => {
 };
 
 /**
- * Lista todos os restaurantes com seus Planos e Regiões
+ * Lista todos os restaurantes com seus Planos, Regiões E CONFIGURAÇÃO
  */
 exports.getAllTenants = async () => {
   const restaurants = await Restaurant.findAll({
@@ -109,14 +113,9 @@ exports.getAllTenants = async () => {
         attributes: ['name', 'email'],
         limit: 1
       },
-      {
-        model: Plan,
-        attributes: ['name', 'priceMonthly', 'currency']
-      },
-      {
-        model: Region,
-        attributes: ['name', 'country']
-      }
+      { model: Plan, attributes: ['name', 'priceMonthly', 'currency'] },
+      { model: Region, attributes: ['name', 'country'] },
+      { model: RestaurantConfig, as: 'config' } // Incluindo Config
     ],
     order: [['createdAt', 'DESC']]
   });
@@ -129,6 +128,7 @@ exports.getTenantById = async (id) => {
     include: [
       { model: Plan },
       { model: Region },
+      { model: RestaurantConfig, as: 'config' }, // Incluindo Config
       { model: User, where: { role: 'manager' }, required: false }
     ]
   });
@@ -139,7 +139,7 @@ exports.getTenantById = async (id) => {
  */
 exports.updateTenantStatus = async (restaurantId, isActive) => {
   const restaurant = await Restaurant.findByPk(restaurantId);
-  if (!restaurant) throw new AppError('Restaurante não encontrado.', 404);
+  if (!restaurant) throw new AppError('Restaurante no encontrado.', 404);
 
   restaurant.isActive = isActive;
   await restaurant.save();
@@ -148,15 +148,26 @@ exports.updateTenantStatus = async (restaurantId, isActive) => {
 };
 
 exports.updateTenant = async (id, data) => {
-  const restaurant = await Restaurant.findByPk(id);
-  if (!restaurant) throw new AppError('Restaurante não encontrado.', 404);
+  const restaurant = await Restaurant.findByPk(id, { include: [{ model: RestaurantConfig, as: 'config' }] });
+  if (!restaurant) throw new AppError('Restaurante no encontrado.', 404);
+
+  // Atualiza dados do Restaurante
   await restaurant.update(data);
+
+  // Atualiza Configuração se fornecida
+  if (data.config && restaurant.config) {
+    await restaurant.config.update(data.config);
+  } else if (data.config && !restaurant.config) {
+    // Caso raro onde config não existe
+    await RestaurantConfig.create({ ...data.config, restaurantId: id });
+  }
+
   return restaurant;
 };
 
 exports.deleteTenant = async (id) => {
   const restaurant = await Restaurant.findByPk(id);
-  if (!restaurant) throw new AppError('Restaurante não encontrado.', 404);
+  if (!restaurant) throw new AppError('Restaurante no encontrado.', 404);
   await restaurant.destroy();
 };
 
@@ -177,7 +188,7 @@ exports.addDocument = async (restaurantId, file, type) => {
 
 exports.removeDocument = async (restaurantId, docId) => {
   const doc = await RestaurantDocument.findOne({ where: { id: docId, restaurantId } });
-  if (!doc) throw new AppError('Documento não encontrado.', 404);
+  if (!doc) throw new AppError('Documento no encontrado.', 404);
 
   // Opcional: Deletar arquivo físico
   const filePath = path.join(__dirname, '../../../public', doc.url);
@@ -190,7 +201,7 @@ exports.removeDocument = async (restaurantId, docId) => {
 
 exports.updateDocument = async (restaurantId, docId, data) => {
   const doc = await RestaurantDocument.findOne({ where: { id: docId, restaurantId } });
-  if (!doc) throw new AppError('Documento não encontrado.', 404);
+  if (!doc) throw new AppError('Documento no encontrado.', 404);
 
   // Update allowed fields
   if (data.name) doc.name = data.name;
@@ -206,7 +217,7 @@ exports.updateDocument = async (restaurantId, docId, data) => {
 
 exports.payDocument = async (restaurantId, docId) => {
   const doc = await RestaurantDocument.findOne({ where: { id: docId, restaurantId } });
-  if (!doc) throw new AppError('Documento não encontrado.', 404);
+  if (!doc) throw new AppError('Documento no encontrado.', 404);
 
   doc.status = 'paid';
   await doc.save();
@@ -231,6 +242,6 @@ exports.addNote = async (restaurantId, content, createdBy) => {
 
 exports.deleteNote = async (restaurantId, noteId) => {
   const note = await RestaurantNote.findOne({ where: { id: noteId, restaurantId } });
-  if (!note) throw new AppError('Nota não encontrada.', 404);
+  if (!note) throw new AppError('Nota no encontrada.', 404);
   await note.destroy();
 };
