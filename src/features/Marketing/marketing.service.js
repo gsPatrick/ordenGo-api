@@ -46,10 +46,13 @@ exports.createScreensaver = async (restaurantId, data) => {
  * 1. Banners Internos (Promoções do próprio restaurante)
  * 2. Campanhas Publicitárias (Ad Network) filtradas por Região
  */
-exports.getScreensavers = async (restaurantId) => {
+exports.getScreensavers = async (restaurantId, onlyActive = true) => {
   // 1. Buscar Banners Internos
+  const bannerWhere = { restaurantId };
+  if (onlyActive) bannerWhere.isActive = true;
+
   const internalBanners = await Banner.findAll({
-    where: { restaurantId, isActive: true },
+    where: bannerWhere,
     order: [['order', 'ASC'], ['createdAt', 'DESC']],
     include: [{ model: Product, as: 'linkedProduct', attributes: ['id', 'name', 'price', 'imageUrl'] }]
   });
@@ -59,8 +62,8 @@ exports.getScreensavers = async (restaurantId) => {
   
   let adCreatives = [];
 
-  // 3. Buscar Campanhas Ativas
-  // Regra: Status 'active', Dentro do prazo, e (Global OU Na Região do Restaurante)
+  // 3. Buscar Campanhas Ativas (Sempre ativas para o Tablet, mas o gerente talvez só veja as dele)
+  // Nota: Campanhas de Ads externos são SEMPRE filtradas por status active para entrega.
   if (restaurant) {
     const now = new Date();
     
@@ -74,11 +77,8 @@ exports.getScreensavers = async (restaurantId) => {
         {
           model: Region,
           attributes: ['id'],
-          through: { attributes: [] }, // Tabela pivô
-          required: false // Left Join (permite campanhas sem região = Globais?)
-          // OBS: Se quiser forçar que campanhas globais não tenham região, a lógica muda.
-          // Aqui assumimos: Se a campanha tem regiões, o restaurante tem que estar em uma delas.
-          // Se a campanha não tem regiões, ela é global.
+          through: { attributes: [] },
+          required: false
         },
         {
           model: AdCreative,
@@ -87,14 +87,12 @@ exports.getScreensavers = async (restaurantId) => {
       ]
     });
 
-    // Filtragem de Região em Memória (mais seguro para lógica Global vs Regional)
     activeCampaigns.forEach(campaign => {
       const campaignRegions = campaign.Regions.map(r => r.id);
       const isGlobal = campaignRegions.length === 0;
       const matchesRegion = restaurant.regionId && campaignRegions.includes(restaurant.regionId);
 
       if (isGlobal || matchesRegion) {
-        // Adiciona os criativos dessa campanha à lista
         campaign.creatives.forEach(creative => {
           adCreatives.push({
             ...creative.toJSON(),
@@ -115,25 +113,24 @@ exports.getScreensavers = async (restaurantId) => {
     title: b.title, 
     description: b.description,
     linkedProduct: b.linkedProduct, 
-    duration: 10, // Duração padrão interno
+    duration: 10,
+    isActive: b.isActive, // Adicionado para o gerente saber o status
     campaignId: null,
     creativeId: null
   }));
 
   const formattedAds = adCreatives.map(ad => ({
     type: 'ad',
-    id: ad.id, // Creative ID
+    id: ad.id,
     imageUrl: ad.mediaUrl,
-    title: { pt: '' }, // Ads geralmente já tem texto na imagem
+    title: { pt: '' },
     description: { pt: '' },
     linkUrl: ad.linkUrl,
     duration: ad.duration || 15,
-    campaignId: ad.campaignId, // CRÍTICO PARA TRACKING
-    creativeId: ad.id          // CRÍTICO PARA TRACKING
+    campaignId: ad.campaignId,
+    creativeId: ad.id
   }));
 
-  // Misturar ou priorizar Ads? 
-  // Por enquanto, retornamos tudo junto. O Frontend faz o "Shuffle" ou "Round Robin".
   return [...formattedInternal, ...formattedAds];
 };
 
@@ -160,8 +157,10 @@ exports.createPromotion = async (restaurantId, data) => {
   return await Promotion.create({ ...data, restaurantId });
 };
 
-exports.getPromotions = async (restaurantId) => {
-  return await Promotion.findAll({ where: { restaurantId, isActive: true } });
+exports.getPromotions = async (restaurantId, onlyActive = true) => {
+  const where = { restaurantId };
+  if (onlyActive) where.isActive = true;
+  return await Promotion.findAll({ where, order: [['createdAt', 'DESC']] });
 };
 
 exports.togglePromotion = async (restaurantId, promoId) => {

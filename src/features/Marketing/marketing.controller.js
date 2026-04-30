@@ -5,8 +5,10 @@ const AppError = require('../../utils/AppError');
 // --- SCREENSAVERS ---
 
 exports.listScreensavers = catchAsync(async (req, res, next) => {
-  // Se for público (Tablet), req.restaurantId deve ter sido injetado antes
-  const banners = await marketingService.getScreensavers(req.restaurantId);
+  // Se for público (Tablet), req.restaurantId deve ter sido injetado antes (via middleware) ou via params.
+  // Se req.query.all for 'true', listamos inativos também (uso no painel do gerente).
+  const onlyActive = req.query.all !== 'true';
+  const banners = await marketingService.getScreensavers(req.restaurantId, onlyActive);
   res.status(200).json({ status: 'success', data: { banners } });
 });
 
@@ -32,7 +34,8 @@ exports.deleteScreensaver = catchAsync(async (req, res, next) => {
 // --- PROMOÇÕES ---
 
 exports.listPromotions = catchAsync(async (req, res, next) => {
-  const promotions = await marketingService.getPromotions(req.restaurantId);
+  const onlyActive = req.query.all !== 'true';
+  const promotions = await marketingService.getPromotions(req.restaurantId, onlyActive);
   res.status(200).json({ status: 'success', data: { promotions } });
 });
 
