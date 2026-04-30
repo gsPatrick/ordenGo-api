@@ -47,6 +47,7 @@ const Advertiser = require('./Advertiser');
 const Campaign = require('./Campaign');
 const AdCreative = require('./AdCreative');
 const AdImpression = require('./AdImpression');
+const SystemAd = require('./SystemAd');
 
 // --- Pedidos & Operação ---
 const Order = require('./Order');
@@ -278,5 +279,6 @@ module.exports = {
   Advertiser,
   Campaign,
   AdCreative,
-  AdImpression
+  AdImpression,
+  SystemAd
 };
