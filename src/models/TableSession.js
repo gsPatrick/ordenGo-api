@@ -15,6 +15,10 @@ const TableSession = sequelize.define('TableSession', {
     type: DataTypes.UUID,
     allowNull: false,
   },
+  sessionToken: { // Token dinâmico para o QR Code da sessão
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   clientName: { // Opcional, se o cliente se identificar
     type: DataTypes.STRING,
   },

@@ -21,7 +21,9 @@ const LedgerEntry = require('./LedgerEntry');
 // --- Tenant (Restaurante) ---
 const Restaurant = require('./Restaurant');
 const RestaurantConfig = require('./RestaurantConfig');
-const PushSubscription = require('./PushSubscription'); 
+const RestaurantDocument = require('./RestaurantDocument');
+const RestaurantNote = require('./RestaurantNote');
+const PushSubscription = require('./PushSubscription');
 const Table = require('./Table');
 const TableSession = require('./TableSession');
 const TableDevice = require('./TableDevice');
@@ -36,8 +38,9 @@ const ModifierGroup = require('./ModifierGroup');
 const Modifier = require('./Modifier');
 
 // --- Marketing Interno (Restaurante) ---
-const Banner = require('./Banner'); 
+const Banner = require('./Banner');
 const Promotion = require('./Promotion');
+const ClientAd = require('./ClientAd'); // Novo Screensaver
 
 // --- Rede de Publicidade (Ad Network) ---
 const Advertiser = require('./Advertiser');
@@ -67,6 +70,14 @@ Restaurant.belongsTo(Region, { foreignKey: 'regionId' });
 // Configurações Visuais
 Restaurant.hasOne(RestaurantConfig, { foreignKey: 'restaurantId', as: 'config', onDelete: 'CASCADE' });
 RestaurantConfig.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
+// Documentos
+Restaurant.hasMany(RestaurantDocument, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
+RestaurantDocument.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
+// Notas (Notes)
+Restaurant.hasMany(RestaurantNote, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
+RestaurantNote.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
 // Equipe
 Restaurant.hasMany(User, { foreignKey: 'restaurantId' });
@@ -166,7 +177,12 @@ Banner.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 Banner.belongsTo(Product, { foreignKey: 'linkedProductId', as: 'linkedProduct' });
 
 Restaurant.hasMany(Promotion, { foreignKey: 'restaurantId' });
+Restaurant.hasMany(Promotion, { foreignKey: 'restaurantId' });
 Promotion.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
+// Screensaver Ads (Client)
+Restaurant.hasMany(ClientAd, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
+ClientAd.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
 
 // --- 2.7. Ad Network (Publicidade Global) ---
@@ -219,41 +235,45 @@ module.exports = {
   User,
   SystemSetting,
   AuditLog,
-  
+
   // SaaS Business
   Plan,
   Region,
   ExchangeRate,
-  
+
   // Financeiro
   Invoice,
   LedgerEntry,
-  
+
   // Tenant Models
   Restaurant,
   RestaurantConfig,
+  RestaurantDocument,
+  RestaurantNote,
   PushSubscription,
   Table,
   TableSession,
   TableDevice,
   Notification,
   Review,
-  
+
   // Menu Models
   Category,
   Product,
   ProductVariant,
   ModifierGroup,
   Modifier,
-  
+
   // Order Models
   Order,
   OrderItem,
-  
+
   // Marketing Interno
   Banner,
+  Banner,
   Promotion,
-  
+  ClientAd,
+
   // Ad Network
   Advertiser,
   Campaign,

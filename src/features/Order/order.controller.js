@@ -8,7 +8,7 @@ const { Notification, Table } = require('../../models'); // <--- IMPORTAR MODELS
 exports.startSession = catchAsync(async (req, res, next) => {
   // MUDANÇA: Removemos clientName do body. Apenas tableId importa.
   const { tableId } = req.body;
-  
+
   const restaurantId = req.restaurantId || req.body.restaurantId;
 
   if (!restaurantId) {
@@ -25,28 +25,34 @@ exports.startSession = catchAsync(async (req, res, next) => {
   res.status(200).json({ status: 'success', data: { session } });
 });
 
+exports.validateSession = catchAsync(async (req, res, next) => {
+  const { token } = req.params;
+  const session = await orderService.validateSessionToken(token);
+  res.status(200).json({ status: 'success', data: { session } });
+});
+
 exports.closeSession = catchAsync(async (req, res, next) => {
   const { paymentMethod } = req.body;
   const session = await orderService.closeSession(req.restaurantId, req.params.id, paymentMethod);
-  
+
   // --- CORREÇÃO 1: Limpar TODAS as notificações pendentes desta mesa ---
   // Isso impede que sobrem notificações antigas após fechar a conta
   await Notification.update(
     { status: 'resolved', resolvedAt: new Date() },
-    { 
-      where: { 
+    {
+      where: {
         tableId: session.tableId, // UUID da mesa
-        status: 'pending' 
-      } 
+        status: 'pending'
+      }
     }
   );
 
   const io = req.io;
   const restaurantRoom = `restaurant_${req.restaurantId}`;
-  
+
   // Avisa o Dashboard (Limpa alertas e muda cor da mesa)
   io.to(restaurantRoom).emit('table_freed', { tableId: session.tableId });
-  
+
   // Emite evento para limpar notificações visuais no painel do garçom
   // (Caso o frontend do garçom esteja ouvindo especificamente remoções)
   io.to(restaurantRoom).emit('notifications_cleared', { tableId: session.tableId });
@@ -65,8 +71,8 @@ exports.getSessionDetails = catchAsync(async (req, res, next) => {
 // --- PEDIDOS ---
 
 exports.placeOrder = catchAsync(async (req, res, next) => {
-  const waiterId = req.user ? req.user.id : null; 
-  
+  const waiterId = req.user ? req.user.id : null;
+
   const restaurantId = req.restaurantId || req.body.restaurantId;
   if (!restaurantId) return next(new AppError('Restaurant ID não identificado.', 400));
 
@@ -83,11 +89,11 @@ exports.updateStatus = catchAsync(async (req, res, next) => {
   const order = await orderService.updateOrderStatus(req.restaurantId, req.params.id, status);
 
   const tableId = order.TableSession.tableId;
-  req.io.to(`table_${tableId}`).emit('order_status_update', { 
-    orderId: order.id, 
-    status: order.status 
+  req.io.to(`table_${tableId}`).emit('order_status_update', {
+    orderId: order.id,
+    status: order.status
   });
-  
+
   req.io.to(`restaurant_${req.restaurantId}`).emit('order_updated', order);
 
   res.status(200).json({ status: 'success', data: { order } });

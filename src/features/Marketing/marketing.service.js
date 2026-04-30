@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
-const { 
-  Banner, 
-  Product, 
+const {
+  Banner,
+  Product,
   Promotion,
   Campaign,
   AdCreative,
@@ -19,23 +19,23 @@ const {
  */
 exports.createScreensaver = async (restaurantId, data) => {
   const imageUrl = `/uploads/${data.filename}`;
-  
+
   let title = data.title;
   let description = data.description;
-  
+
   if (typeof title === 'string') {
-    try { title = JSON.parse(title); } catch(e) { title = { pt: title }; }
+    try { title = JSON.parse(title); } catch (e) { title = { pt: title }; }
   }
   if (typeof description === 'string') {
-    try { description = JSON.parse(description); } catch(e) { description = { pt: description }; }
+    try { description = JSON.parse(description); } catch (e) { description = { pt: description }; }
   }
 
   return await Banner.create({
     restaurantId,
     imageUrl,
-    title, 
-    description, 
-    linkedProductId: data.linkedProductId || null, 
+    title,
+    description,
+    linkedProductId: data.linkedProductId || null,
     order: data.order || 0,
     isActive: true
   });
@@ -59,14 +59,14 @@ exports.getScreensavers = async (restaurantId, onlyActive = true) => {
 
   // 2. Identificar Região do Restaurante
   const restaurant = await Restaurant.findByPk(restaurantId, { attributes: ['regionId'] });
-  
+
   let adCreatives = [];
 
   // 3. Buscar Campanhas Ativas (Sempre ativas para o Tablet, mas o gerente talvez só veja as dele)
   // Nota: Campanhas de Ads externos são SEMPRE filtradas por status active para entrega.
   if (restaurant) {
     const now = new Date();
-    
+
     const activeCampaigns = await Campaign.findAll({
       where: {
         status: 'active',
@@ -110,7 +110,7 @@ exports.getScreensavers = async (restaurantId, onlyActive = true) => {
     type: 'internal',
     id: b.id,
     imageUrl: b.imageUrl,
-    title: b.title, 
+    title: b.title,
     description: b.description,
     linkedProduct: b.linkedProduct, 
     duration: 10,
@@ -146,12 +146,12 @@ exports.deleteScreensaver = async (restaurantId, bannerId) => {
 
 exports.createPromotion = async (restaurantId, data) => {
   if (data.filename) data.imageUrl = `/uploads/${data.filename}`;
-  
+
   if (typeof data.title === 'string') {
-    try { data.title = JSON.parse(data.title); } catch(e) { data.title = { pt: data.title }; }
+    try { data.title = JSON.parse(data.title); } catch (e) { data.title = { pt: data.title }; }
   }
   if (typeof data.activeDays === 'string') {
-    try { data.activeDays = JSON.parse(data.activeDays); } catch(e) { data.activeDays = []; }
+    try { data.activeDays = JSON.parse(data.activeDays); } catch (e) { data.activeDays = []; }
   }
 
   return await Promotion.create({ ...data, restaurantId });
@@ -166,7 +166,7 @@ exports.getPromotions = async (restaurantId, onlyActive = true) => {
 exports.togglePromotion = async (restaurantId, promoId) => {
   const promo = await Promotion.findOne({ where: { id: promoId, restaurantId } });
   if (!promo) throw new AppError('Promoção não encontrada', 404);
-  
+
   promo.isActive = !promo.isActive;
   await promo.save();
   return promo;

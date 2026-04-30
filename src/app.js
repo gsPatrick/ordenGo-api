@@ -62,7 +62,11 @@ app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 // ============================================================
 // 3. ROTAS
 // ============================================================
+const screensaverRoutes = require('./features/Screensaver/screensaver.routes');
+
 app.use('/api/v1', routes);
+app.use('/api/screensaver', screensaverRoutes); // Registrando manualmente por enquanto
+
 
 app.all(/(.*)/, (req, res, next) => {
   next(new AppError(`Não foi possível encontrar ${req.originalUrl} neste servidor!`, 404));
@@ -132,7 +136,7 @@ async function createDefaultSuperAdmin() {
 // ============================================================
 const PORT = process.env.PORT || 3000;
 
-sequelize.sync({ force: false })
+sequelize.sync()
   .then(async () => {
     console.log('💾 Banco de dados conectado e sincronizado.');
     // Executa a verificação/criação do Admin

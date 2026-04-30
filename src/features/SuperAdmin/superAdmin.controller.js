@@ -1,11 +1,14 @@
 const superAdminService = require('./superAdmin.service');
 const catchAsync = require('../../utils/catchAsync');
+const AppError = require('../../utils/AppError');
 const jwt = require('jsonwebtoken');
 
 const bcrypt = require('bcryptjs');
-const { 
-  sequelize, 
-  User, 
+const {
+  sequelize,
+  User,
+  Restaurant,
+  RestaurantConfig
 } = require('../../models');
 
 exports.createRestaurant = catchAsync(async (req, res, next) => {
@@ -13,7 +16,7 @@ exports.createRestaurant = catchAsync(async (req, res, next) => {
 
   res.status(201).json({
     status: 'success',
-    message: 'Restaurante criado com sucesso!',
+    message: '¡Restaurante creado con éxito!',
     data: {
       restaurantId: restaurant.id,
       name: restaurant.name,
@@ -39,17 +42,16 @@ exports.listRestaurants = catchAsync(async (req, res, next) => {
 
 exports.toggleStatus = catchAsync(async (req, res, next) => {
   const { id } = req.params;
-  
-  const { Restaurant } = require('../../models');
+
   const restaurant = await Restaurant.findByPk(id);
-  if(!restaurant) return next(new AppError('Restaurante não encontrado', 404));
-  
+  if (!restaurant) return next(new AppError('Restaurante no encontrado', 404));
+
   restaurant.isActive = !restaurant.isActive;
   await restaurant.save();
 
   res.status(200).json({
     status: 'success',
-    message: `Restaurante ${restaurant.isActive ? 'ativado' : 'bloqueado'} com sucesso.`,
+    message: `Restaurante ${restaurant.isActive ? 'activado' : 'bloqueado'} con éxito.`,
     data: {
       isActive: restaurant.isActive
     }
@@ -58,25 +60,95 @@ exports.toggleStatus = catchAsync(async (req, res, next) => {
 
 exports.impersonateTenant = catchAsync(async (req, res, next) => {
   const { id } = req.params; // ID do Restaurante
-  
-  const manager = await User.findOne({ 
-    where: { restaurantId: id, role: 'manager' } 
+
+  const manager = await User.findOne({
+    where: { restaurantId: id, role: 'manager' },
+    include: [{
+      model: Restaurant,
+      required: true,
+      attributes: ['id', 'name', 'isActive', 'isOnboardingCompleted', 'slug'],
+      include: [{ model: RestaurantConfig, as: 'config', attributes: ['logoUrl'] }]
+    }]
   });
 
   if (!manager) {
-    return next(new AppError('Este restaurante não possui um gerente ativo.', 404));
+    return next(new AppError('Este restaurante no tiene un gerente activo.', 404));
   }
 
   // ALTERAÇÃO: Removido '1h' hardcoded. Agora usa a config global ou 3d.
   const token = jwt.sign(
-    { id: manager.id, role: manager.role, restaurantId: manager.restaurantId }, 
-    process.env.JWT_SECRET, 
-    { expiresIn: process.env.JWT_EXPIRES_IN || '3d' }
+    { id: manager.id, role: manager.role, restaurantId: manager.restaurantId },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
   );
+
+  const userJSON = manager.toJSON();
+  if (userJSON.Restaurant && userJSON.Restaurant.config) {
+    userJSON.Restaurant.logo = userJSON.Restaurant.config.logoUrl;
+    delete userJSON.Restaurant.config;
+  }
 
   res.status(200).json({
     status: 'success',
     token,
-    data: { user: manager }
+    data: { user: userJSON }
   });
+});
+
+exports.getRestaurant = catchAsync(async (req, res, next) => {
+  const restaurant = await superAdminService.getTenantById(req.params.id);
+  if (!restaurant) return next(new AppError('Restaurante no encontrado', 404));
+  res.status(200).json({ status: 'success', data: { restaurant } });
+});
+
+exports.updateRestaurant = catchAsync(async (req, res, next) => {
+  const restaurant = await superAdminService.updateTenant(req.params.id, req.body);
+  res.status(200).json({ status: 'success', data: { restaurant } });
+});
+
+exports.deleteRestaurant = catchAsync(async (req, res, next) => {
+  await superAdminService.deleteTenant(req.params.id);
+  res.status(204).json({ status: 'success', data: null });
+});
+
+exports.listDocuments = catchAsync(async (req, res, next) => {
+  const documents = await superAdminService.getDocuments(req.params.id);
+  res.status(200).json({ status: 'success', results: documents.length, data: { documents } });
+});
+
+exports.uploadDocument = catchAsync(async (req, res, next) => {
+  if (!req.file) return next(new AppError('No file uploaded', 400));
+  const document = await superAdminService.addDocument(req.params.id, req.file, req.body.type);
+  res.status(201).json({ status: 'success', data: { document } });
+});
+
+exports.updateDocument = catchAsync(async (req, res, next) => {
+  const document = await superAdminService.updateDocument(req.params.id, req.params.docId, req.body);
+  res.status(200).json({ status: 'success', data: { document } });
+});
+
+exports.payDocument = catchAsync(async (req, res, next) => {
+  const document = await superAdminService.payDocument(req.params.id, req.params.docId);
+  res.status(200).json({ status: 'success', data: { document } });
+});
+
+exports.deleteDocument = catchAsync(async (req, res, next) => {
+  await superAdminService.removeDocument(req.params.id, req.params.docId);
+  res.status(204).json({ status: 'success', data: null });
+});
+
+// --- NOTES ---
+exports.listNotes = catchAsync(async (req, res) => {
+  const notes = await superAdminService.getNotes(req.params.id);
+  res.json({ status: 'success', data: { notes } });
+});
+
+exports.createNote = catchAsync(async (req, res) => {
+  const note = await superAdminService.addNote(req.params.id, req.body.content, 'Super Admin');
+  res.status(201).json({ status: 'success', data: { note } });
+});
+
+exports.deleteNote = catchAsync(async (req, res) => {
+  await superAdminService.deleteNote(req.params.id, req.params.noteId);
+  res.status(204).send();
 });

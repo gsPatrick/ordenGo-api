@@ -48,6 +48,7 @@ exports.getFullMenu = async (restaurantId, includeUnavailable = false) => {
             model: Product,
             where: productWhere,
             required: false,
+            order: [['order', 'ASC']],
             include: [
               { model: ProductVariant, as: 'variants' },
               {
@@ -64,6 +65,7 @@ exports.getFullMenu = async (restaurantId, includeUnavailable = false) => {
         model: Product,
         where: productWhere,
         required: false,
+        order: [['order', 'ASC']],
         include: [
           { model: ProductVariant, as: 'variants' },
           {
@@ -251,4 +253,36 @@ exports.deleteProduct = async (restaurantId, id) => {
 
   await product.destroy();
   return true;
+};
+
+exports.reorderCategories = async (restaurantId, orderedIds) => {
+  const transaction = await sequelize.transaction();
+  try {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await Category.update(
+        { order: i },
+        { where: { id: orderedIds[i], restaurantId }, transaction }
+      );
+    }
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+};
+
+exports.reorderProducts = async (restaurantId, orderedIds) => {
+  const transaction = await sequelize.transaction();
+  try {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await Product.update(
+        { order: i },
+        { where: { id: orderedIds[i], restaurantId }, transaction }
+      );
+    }
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 };

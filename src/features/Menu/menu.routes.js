@@ -37,13 +37,21 @@ router.get('/modifiers', restrictTo('manager', 'admin', 'waiter'), menuControlle
 router.use(restrictTo('manager', 'admin'));
 
 // Categorias
+router.patch('/categories/reorder', menuController.reorderCategories); // MOVED UP to avoid conflict with :id
 router.post('/categories', categoryUpload, menuController.createCategory);
 router.patch('/categories/:id', categoryUpload, menuController.updateCategory);
 router.delete('/categories/:id', menuController.deleteCategory);
 
 // Produtos
-router.post('/products', upload.single('image'), menuController.createProduct);
-router.patch('/products/:id', upload.single('image'), menuController.updateProduct);
+router.patch('/products/reorder', menuController.reorderProducts); // MOVED UP to avoid conflict with :id
+// Configuração de upload para produtos (1 imagem principal + até 10 da galeria)
+const productUpload = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'gallery', maxCount: 10 }
+]);
+
+router.post('/products', productUpload, menuController.createProduct);
+router.patch('/products/:id', productUpload, menuController.updateProduct);
 router.delete('/products/:id', menuController.deleteProduct);
 router.patch('/products/:id/availability', menuController.toggleAvailability); // "86 it" rápido
 

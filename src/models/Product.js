@@ -31,6 +31,10 @@ const Product = sequelize.define('Product', {
   imageUrl: {
     type: DataTypes.STRING,
   },
+  gallery: {
+    type: DataTypes.JSONB, // Array de URLs adicionais
+    defaultValue: []
+  },
   // Flags de Marketing
   isOffer: {
     type: DataTypes.BOOLEAN,
@@ -51,6 +55,10 @@ const Product = sequelize.define('Product', {
   hasVariants: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
+  },
+  order: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
   }
 });
 

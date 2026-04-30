@@ -1,5 +1,6 @@
-const { 
-  Order, OrderItem, TableSession, Table, Product, ProductVariant, User, sequelize 
+const crypto = require('crypto');
+const {
+  Order, OrderItem, TableSession, Table, Product, ProductVariant, User, sequelize
 } = require('../../models');
 const AppError = require('../../utils/AppError');
 
@@ -14,21 +15,21 @@ const AppError = require('../../utils/AppError');
 exports.startSession = async (restaurantId, tableIdInput) => {
   // 1. Tenta encontrar a mesa (aceita tanto ID 1 quanto UUID)
   let table;
-  
+
   // Verifica se é um número inteiro (ID sequencial) ou string numérica
   // UUIDs contêm hífens e letras, IDs numéricos não.
   if (!isNaN(tableIdInput) && !String(tableIdInput).includes('-')) {
     table = await Table.findOne({ where: { id: tableIdInput, restaurantId } });
   } else {
     // Se for string complexa (UUID), busca pelo UUID
-    table = await Table.findOne({ 
-      where: { 
+    table = await Table.findOne({
+      where: {
         restaurantId,
         uuid: tableIdInput
-      } 
+      }
     });
   }
-  
+
   if (!table) throw new AppError('Mesa não encontrada', 404);
 
   // Se já tem sessão aberta, retorna ela para evitar duplicação
@@ -38,13 +39,17 @@ exports.startSession = async (restaurantId, tableIdInput) => {
 
   const transaction = await sequelize.transaction();
   try {
+    // Gera token de sessão único (16 chars hex)
+    const sessionToken = crypto.randomBytes(8).toString('hex');
+
     // Cria a sessão
     const session = await TableSession.create({
       restaurantId,
       // CRÍTICO: Salvamos o UUID da mesa na sessão (pois a coluna é type: UUID), 
       // mesmo que a entrada tenha sido o ID numérico 1.
-      tableId: table.uuid, 
-      clientName: `Mesa ${table.number}`, 
+      tableId: table.uuid,
+      sessionToken, // Salva o token gerado
+      clientName: `Mesa ${table.number}`,
       status: 'open',
       openedAt: new Date()
     }, { transaction });
@@ -53,7 +58,7 @@ exports.startSession = async (restaurantId, tableIdInput) => {
     table.status = 'occupied';
     table.currentSessionId = session.id;
     table.lifetimeSessionCount = (table.lifetimeSessionCount || 0) + 1;
-    
+
     await table.save({ transaction });
 
     await transaction.commit();
@@ -65,12 +70,28 @@ exports.startSession = async (restaurantId, tableIdInput) => {
 };
 
 /**
+ * Valida o token da sessão (Usado pelo QR Code dinâmico)
+ */
+exports.validateSessionToken = async (token) => {
+  const session = await TableSession.findOne({
+    where: { sessionToken: token, status: 'open' },
+    include: [{ model: Table }]
+  });
+
+  if (!session) {
+    throw new AppError('Sessão inválida ou expirada.', 401);
+  }
+
+  return session;
+};
+
+/**
  * Fecha a sessão (Conta paga)
  */
 exports.closeSession = async (restaurantId, sessionId, paymentMethod) => {
   const session = await TableSession.findOne({ where: { id: sessionId, restaurantId } });
   if (!session) throw new AppError('Sessão não encontrada', 404);
-  
+
   // Busca a mesa usando o UUID salvo na sessão
   const table = await Table.findOne({ where: { uuid: session.tableId } });
 
@@ -84,7 +105,7 @@ exports.closeSession = async (restaurantId, sessionId, paymentMethod) => {
     if (table) {
       table.status = 'free';
       table.currentSessionId = null;
-      
+
       // Cálculo de tempo decorrido em segundos (Telemetria)
       const startTime = new Date(session.openedAt).getTime();
       const endTime = new Date(session.closedAt).getTime();
@@ -140,7 +161,7 @@ exports.createOrder = async (restaurantId, data) => {
 
       const finalUnitPrice = unitPrice + modifiersTotal;
       const itemTotal = finalUnitPrice * item.quantity;
-      
+
       orderTotal += itemTotal;
 
       orderItemsData.push({
@@ -188,11 +209,11 @@ exports.createOrder = async (restaurantId, data) => {
 };
 
 exports.updateOrderStatus = async (restaurantId, orderId, status) => {
-  const order = await Order.findOne({ 
+  const order = await Order.findOne({
     where: { id: orderId, restaurantId },
     include: [{ model: TableSession }]
   });
-  
+
   if (!order) throw new AppError('Pedido não encontrado', 404);
 
   order.status = status;
@@ -211,14 +232,14 @@ exports.getSessionOrders = async (sessionId) => {
 
 exports.getActiveOrders = async (restaurantId) => {
   return await Order.findAll({
-    where: { 
+    where: {
       restaurantId,
       status: ['pending', 'accepted', 'preparing', 'ready']
     },
     include: [
-      { 
-        model: TableSession, 
-        include: [{ model: Table }] 
+      {
+        model: TableSession,
+        include: [{ model: Table }]
       },
       { model: OrderItem, as: 'items', include: [Product] }
     ],

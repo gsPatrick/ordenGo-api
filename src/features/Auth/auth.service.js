@@ -1,14 +1,14 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { User, Restaurant } = require('../../models');
+const { User, Restaurant, RestaurantConfig } = require('../../models');
 const AppError = require('../../utils/AppError');
 const { validate: isUuid } = require('uuid');
 
 // Helper para assinar Token
 const signToken = (id, role, restaurantId) => {
-  // ALTERAÇÃO: Mudado de '1d' para '3d' como padrão
+  // ALTERAÇÃO: Mudado de '1d' para '30d' como padrão
   return jwt.sign({ id, role, restaurantId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '3d',
+    expiresIn: process.env.JWT_EXPIRES_IN || '30d',
   });
 };
 
@@ -22,9 +22,14 @@ exports.loginUser = async (email, password) => {
     throw new AppError('Por favor, forneça email e senha.', 400);
   }
 
-  const user = await User.findOne({ 
+  const user = await User.findOne({
     where: { email },
-    include: [{ model: Restaurant, required: true, attributes: ['id', 'isActive', 'isOnboardingCompleted', 'slug'] }] 
+    include: [{
+      model: Restaurant,
+      required: true,
+      attributes: ['id', 'name', 'isActive', 'isOnboardingCompleted', 'slug'],
+      include: [{ model: RestaurantConfig, as: 'config', attributes: ['logoUrl'] }]
+    }]
   });
 
   if (!user || !(await bcrypt.compare(password, user.password))) {
@@ -36,9 +41,16 @@ exports.loginUser = async (email, password) => {
   }
 
   const token = signToken(user.id, user.role, user.restaurantId);
-  user.password = undefined;
 
-  return { user, token };
+  // Map logoUrl to Restaurant.logo for frontend compatibility
+  const userJSON = user.toJSON();
+  if (userJSON.Restaurant && userJSON.Restaurant.config) {
+    userJSON.Restaurant.logo = userJSON.Restaurant.config.logoUrl;
+    delete userJSON.Restaurant.config;
+  }
+  delete userJSON.password;
+
+  return { user: userJSON, token };
 };
 
 exports.loginWaiterWithPin = async (pin, restaurantIdentifier) => {
@@ -50,29 +62,41 @@ exports.loginWaiterWithPin = async (pin, restaurantIdentifier) => {
 
   if (!isValidUUID(restaurantIdentifier)) {
     const restaurant = await Restaurant.findOne({ where: { slug: restaurantIdentifier } });
-    
+
     if (!restaurant) {
       throw new AppError(`Restaurante '${restaurantIdentifier}' não encontrado.`, 404);
     }
-    
+
     targetRestaurantId = restaurant.id;
   }
 
   const user = await User.findOne({
-    where: { 
-      pin, 
+    where: {
+      pin,
       restaurantId: targetRestaurantId,
       role: 'waiter'
-    }
+    },
+    include: [{
+      model: Restaurant,
+      required: true,
+      attributes: ['id', 'name', 'isActive', 'isOnboardingCompleted', 'slug'],
+      include: [{ model: RestaurantConfig, as: 'config', attributes: ['logoUrl'] }]
+    }]
   });
 
   if (!user) {
     throw new AppError('PIN incorreto ou usuário não encontrado neste restaurante.', 401);
   }
 
-  // Garçons também herdam a expiração de 3 dias (útil para tablets)
+  // Garçons também herdam a expiração de 30 dias (útil para tablets)
   const token = signToken(user.id, user.role, user.restaurantId);
-  user.password = undefined;
 
-  return { user, token };
+  const userJSON = user.toJSON();
+  if (userJSON.Restaurant && userJSON.Restaurant.config) {
+    userJSON.Restaurant.logo = userJSON.Restaurant.config.logoUrl;
+    delete userJSON.Restaurant.config;
+  }
+  delete userJSON.password;
+
+  return { user: userJSON, token };
 };

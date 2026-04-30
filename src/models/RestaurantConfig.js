@@ -26,11 +26,11 @@ const RestaurantConfig = sequelize.define('RestaurantConfig', {
   },
   backgroundColor: {
     type: DataTypes.STRING(7),
-    defaultValue: '#1f1c1d', 
+    defaultValue: '#1f1c1d',
   },
-  
+
   // --- CONTEÚDO INSTITUCIONAL (i18n) ---
-  
+
   // Nome de exibição comercial (ex: "A Casa da Picanha")
   publicTitle: {
     type: DataTypes.JSONB, // Ex: { pt: "Casa da Picanha", en: "Steak House" }
@@ -49,7 +49,7 @@ const RestaurantConfig = sequelize.define('RestaurantConfig', {
   },
 
   // --- IMAGENS INSTITUCIONAIS (Arrays de URLs) ---
-  
+
   institutionalBanners: {
     type: DataTypes.JSONB, // Array de Strings: ["/uploads/a.jpg", "/uploads/b.jpg"]
     defaultValue: [],
@@ -67,7 +67,14 @@ const RestaurantConfig = sequelize.define('RestaurantConfig', {
   wifiSsid: { type: DataTypes.STRING },
   wifiPassword: { type: DataTypes.STRING },
   enableCallWaiter: { type: DataTypes.BOOLEAN, defaultValue: true },
-  enableBillRequest: { type: DataTypes.BOOLEAN, defaultValue: true }
+  enableCallWaiter: { type: DataTypes.BOOLEAN, defaultValue: true },
+  enableBillRequest: { type: DataTypes.BOOLEAN, defaultValue: true },
+
+  // --- SCREENSAVER CONFIG ---
+  screensaverEnabled: { type: DataTypes.BOOLEAN, defaultValue: true },
+  screensaverIdleTime: { type: DataTypes.INTEGER, defaultValue: 120 }, // Segundos
+  screensaverAdminBatchSize: { type: DataTypes.INTEGER, defaultValue: 3 }, // Quantos SystemAds rodam
+  screensaverClientBatchSize: { type: DataTypes.INTEGER, defaultValue: 1 } // Quantos ClientAds rodam
 });
 
 module.exports = RestaurantConfig;
