@@ -50,7 +50,7 @@ exports.createCampaign = async (data) => {
     throw error;
   }
 };
-const sizeOf = require('image-size');
+
 
 /**
  * Adiciona um Criativo (Banner/Vídeo) a uma campanha existente
