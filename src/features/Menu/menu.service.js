@@ -107,7 +107,7 @@ exports.updateCategory = async (restaurantId, id, data) => {
 // ==============================================================================
 
 exports.createProduct = async (restaurantId, data) => {
-  const { variants, modifierGroupIds, ...productData } = data;
+  const { variants, modifierGroupIds, allergens, pizzaConfig, ...productData } = data;
 
   // Transação pois podemos criar variantes junto
   const transaction = await sequelize.transaction();
@@ -117,7 +117,12 @@ exports.createProduct = async (restaurantId, data) => {
       productData.imageUrl = `/uploads/${data.filename}`;
     }
 
-    const product = await Product.create({ ...productData, restaurantId }, { transaction });
+    const product = await Product.create({ 
+      ...productData, 
+      restaurantId,
+      allergens: allergens || [],
+      pizzaConfig: pizzaConfig || { isPizza: false, halfHalfPriceLogic: 'highest' }
+    }, { transaction });
 
     // Se tiver variantes (P, M, G)
     if (variants && variants.length > 0) {
@@ -143,15 +148,17 @@ exports.updateProduct = async (restaurantId, id, data) => {
   const product = await Product.findOne({ where: { id, restaurantId } });
   if (!product) throw new AppError('Produto não encontrado', 404);
 
+  const { variants, modifierGroupIds, ...updateData } = data;
+
   if (data.filename) {
-    data.imageUrl = `/uploads/${data.filename}`;
+    updateData.imageUrl = `/uploads/${data.filename}`;
   }
 
-  await product.update(data);
+  await product.update(updateData);
 
   // Atualizar vínculos de modificadores se enviado
-  if (data.modifierGroupIds) {
-    await product.setModifierGroups(data.modifierGroupIds);
+  if (modifierGroupIds) {
+    await product.setModifierGroups(modifierGroupIds);
   }
 
   return product;

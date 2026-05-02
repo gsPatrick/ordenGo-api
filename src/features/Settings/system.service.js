@@ -69,3 +69,20 @@ exports.getValue = async (key) => {
   const setting = await SystemSetting.findByPk(key);
   return setting ? setting.value : null;
 };
+exports.getSettingsByGroup = async (group) => {
+  return await SystemSetting.findAll({ where: { group } });
+};
+
+exports.updateSettingsBatch = async (settings) => {
+  const transaction = await require('../../models').sequelize.transaction();
+  try {
+    for (const item of settings) {
+      await SystemSetting.upsert(item, { transaction });
+    }
+    await transaction.commit();
+    return true;
+  } catch (error) {
+    await transaction.rollback();
+    throw new AppError('Erro ao salvar lote de configurações.', 500);
+  }
+};

@@ -8,15 +8,20 @@ const sequelize = require('../config/database');
 
 // --- Core & SaaS ---
 const User = require('./User');
+const Role = require('./Role');
+const Permission = require('./Permission');
 const Plan = require('./Plan');
 const Region = require('./Region');
-const SystemSetting = require('./SystemSetting'); // Configurações Globais
+const SystemSetting = require('./SystemSetting'); 
 const AuditLog = require('./AuditLog');
 const ExchangeRate = require('./ExchangeRate');
+const EmailTemplate = require('./EmailTemplate');
 
-// --- Financeiro ---
+// --- Financeiro & Gestão ---
 const Invoice = require('./Invoice');
 const LedgerEntry = require('./LedgerEntry');
+const CashReport = require('./CashReport');
+const Reservation = require('./Reservation');
 
 // --- Tenant (Restaurante) ---
 const Restaurant = require('./Restaurant');
@@ -24,6 +29,8 @@ const RestaurantConfig = require('./RestaurantConfig');
 const RestaurantDocument = require('./RestaurantDocument');
 const RestaurantNote = require('./RestaurantNote');
 const PushSubscription = require('./PushSubscription');
+const Ticket = require('./Ticket'); 
+const TicketMessage = require('./TicketMessage');
 const Table = require('./Table');
 const TableSession = require('./TableSession');
 const TableDevice = require('./TableDevice');
@@ -36,11 +43,12 @@ const Product = require('./Product');
 const ProductVariant = require('./ProductVariant');
 const ModifierGroup = require('./ModifierGroup');
 const Modifier = require('./Modifier');
+const Offer = require('./Offer');
 
 // --- Marketing Interno (Restaurante) ---
 const Banner = require('./Banner');
 const Promotion = require('./Promotion');
-const ClientAd = require('./ClientAd'); // Novo Screensaver
+const ClientAd = require('./ClientAd'); 
 
 // --- Rede de Publicidade (Ad Network) ---
 const Advertiser = require('./Advertiser');
@@ -52,6 +60,7 @@ const SystemAd = require('./SystemAd');
 // --- Pedidos & Operação ---
 const Order = require('./Order');
 const OrderItem = require('./OrderItem');
+const SessionPayment = require('./SessionPayment');
 
 
 // ============================================================
@@ -59,7 +68,6 @@ const OrderItem = require('./OrderItem');
 // ============================================================
 
 // --- 2.1. SaaS & Estrutura de Cobrança ---
-// Planos e Regiões definem o comportamento do Restaurante
 Plan.hasMany(Restaurant, { foreignKey: 'planId' });
 Restaurant.belongsTo(Plan, { foreignKey: 'planId' });
 
@@ -67,163 +75,104 @@ Region.hasMany(Restaurant, { foreignKey: 'regionId' });
 Restaurant.belongsTo(Region, { foreignKey: 'regionId' });
 
 
-// --- 2.2. Restaurante (Core) ---
-// Configurações Visuais
+// --- 2.2. RBAC Dinâmico ---
+Role.hasMany(User, { foreignKey: 'roleId' });
+User.belongsTo(Role, { foreignKey: 'roleId', as: 'userRole' });
+
+Role.belongsToMany(Permission, { through: 'RolePermissions' });
+Permission.belongsToMany(Role, { through: 'RolePermissions' });
+
+
+// --- 2.3. Restaurante (Core) ---
 Restaurant.hasOne(RestaurantConfig, { foreignKey: 'restaurantId', as: 'config', onDelete: 'CASCADE' });
 RestaurantConfig.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
-// Documentos
 Restaurant.hasMany(RestaurantDocument, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
 RestaurantDocument.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
-// Notas (Notes)
 Restaurant.hasMany(RestaurantNote, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
 RestaurantNote.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
-// Equipe
 Restaurant.hasMany(User, { foreignKey: 'restaurantId' });
 User.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
-// Notificações Push dos Garçons
-Restaurant.hasMany(PushSubscription, { foreignKey: 'restaurantId' });
-PushSubscription.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+// --- 2.4. Reservas & Cash Reports (NEW) ---
+Restaurant.hasMany(Reservation, { foreignKey: 'restaurantId' });
+Reservation.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
-User.hasMany(PushSubscription, { foreignKey: 'userId', onDelete: 'CASCADE' });
-PushSubscription.belongsTo(User, { foreignKey: 'userId' });
+Restaurant.hasMany(CashReport, { foreignKey: 'restaurantId' });
+CashReport.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
 
-// --- 2.3. Mesas, Dispositivos e Sessões ---
+// --- 2.5. Mesas & Sessões ---
 Restaurant.hasMany(Table, { foreignKey: 'restaurantId' });
 Table.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
-// Histórico de Sessões da Mesa
 Table.hasMany(TableSession, { as: 'history', foreignKey: 'tableId', sourceKey: 'uuid' });
 TableSession.belongsTo(Table, { foreignKey: 'tableId', targetKey: 'uuid' });
 
-// Sessão Ativa (Ponteiro)
 Table.belongsTo(TableSession, { as: 'activeSession', foreignKey: 'currentSessionId', constraints: false });
 
-// Dispositivos (Tablets) vinculados à Mesa
-Table.hasMany(TableDevice, { as: 'devices', foreignKey: 'tableId', sourceKey: 'uuid' });
-TableDevice.belongsTo(Table, { foreignKey: 'tableId', targetKey: 'uuid' });
+TableSession.hasMany(Order, { foreignKey: 'tableSessionId' });
+Order.belongsTo(TableSession, { foreignKey: 'tableSessionId' });
 
-// Notificações (Chamar Garçom)
-Restaurant.hasMany(Notification, { foreignKey: 'restaurantId' });
-Notification.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+TableSession.hasMany(SessionPayment, { foreignKey: 'tableSessionId' });
+SessionPayment.belongsTo(TableSession, { foreignKey: 'tableSessionId' });
 
-Table.hasMany(Notification, { as: 'notifications', foreignKey: 'tableId', sourceKey: 'uuid' });
-Notification.belongsTo(Table, { foreignKey: 'tableId', targetKey: 'uuid' });
-
-// Avaliações
-Restaurant.hasMany(Review, { foreignKey: 'restaurantId' });
-Review.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
-
-Table.hasMany(Review, { foreignKey: 'tableId', sourceKey: 'uuid' });
-Review.belongsTo(Table, { foreignKey: 'tableId', targetKey: 'uuid' });
-
-TableSession.hasMany(Review, { foreignKey: 'tableSessionId' });
-Review.belongsTo(TableSession, { foreignKey: 'tableSessionId' });
+CashReport.hasMany(SessionPayment, { foreignKey: 'cashReportId' });
+SessionPayment.belongsTo(CashReport, { foreignKey: 'cashReportId' });
 
 
-// --- 2.4. Cardápio (Menu) ---
+// --- 2.6. Suporte (Tickets) ---
+Restaurant.hasMany(Ticket, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
+Ticket.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
+Ticket.hasMany(TicketMessage, { as: 'messages', foreignKey: 'ticketId', onDelete: 'CASCADE' });
+TicketMessage.belongsTo(Ticket, { foreignKey: 'ticketId' });
+
+
+// --- 2.7. Cardápio (Menu) & Ofertas ---
 Restaurant.hasMany(Category, { foreignKey: 'restaurantId' });
 Category.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
+Category.hasMany(Category, { as: 'subcategories', foreignKey: 'parentId', onDelete: 'CASCADE' });
+Category.belongsTo(Category, { as: 'parent', foreignKey: 'parentId' });
 
 Restaurant.hasMany(Product, { foreignKey: 'restaurantId' });
 Product.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
-Restaurant.hasMany(ModifierGroup, { foreignKey: 'restaurantId' });
-ModifierGroup.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
-
-// Hierarquia de Categorias (Recursiva)
-Category.hasMany(Category, { as: 'subcategories', foreignKey: 'parentId', onDelete: 'CASCADE' });
-Category.belongsTo(Category, { as: 'parent', foreignKey: 'parentId' });
-
 Category.hasMany(Product, { foreignKey: 'categoryId' });
 Product.belongsTo(Category, { foreignKey: 'categoryId' });
 
-// Variantes e Modificadores
 Product.hasMany(ProductVariant, { as: 'variants', foreignKey: 'productId', onDelete: 'CASCADE' });
 ProductVariant.belongsTo(Product, { foreignKey: 'productId' });
 
-// Muitos-para-Muitos: Produtos <-> Grupos de Modificadores
 Product.belongsToMany(ModifierGroup, { through: 'ProductModifierGroups', as: 'modifierGroups' });
 ModifierGroup.belongsToMany(Product, { through: 'ProductModifierGroups', as: 'products' });
 
 ModifierGroup.hasMany(Modifier, { as: 'options', foreignKey: 'modifierGroupId', onDelete: 'CASCADE' });
 Modifier.belongsTo(ModifierGroup, { foreignKey: 'modifierGroupId' });
 
+Restaurant.hasMany(Offer, { foreignKey: 'restaurantId' });
+Offer.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
-// --- 2.5. Pedidos (Orders) ---
-TableSession.hasMany(Order, { as: 'orders', foreignKey: 'tableSessionId' });
-Order.belongsTo(TableSession, { foreignKey: 'tableSessionId' });
+Offer.belongsTo(Product, { foreignKey: 'productId' });
 
+
+// --- 2.8. Pedidos (Orders) ---
 Restaurant.hasMany(Order, { foreignKey: 'restaurantId' });
 Order.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
-User.hasMany(Order, { as: 'sales', foreignKey: 'waiterId' });
-Order.belongsTo(User, { as: 'waiter', foreignKey: 'waiterId' });
-
-// Itens do Pedido
 Order.hasMany(OrderItem, { as: 'items', foreignKey: 'orderId', onDelete: 'CASCADE' });
 OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
 
-OrderItem.belongsTo(Product, { foreignKey: 'productId' });
-OrderItem.belongsTo(ProductVariant, { foreignKey: 'productVariantId' });
 
-
-// --- 2.6. Marketing Interno ---
-Restaurant.hasMany(Banner, { foreignKey: 'restaurantId' });
-Banner.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
-Banner.belongsTo(Product, { foreignKey: 'linkedProductId', as: 'linkedProduct' });
-
-Restaurant.hasMany(Promotion, { foreignKey: 'restaurantId' });
-Restaurant.hasMany(Promotion, { foreignKey: 'restaurantId' });
-Promotion.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
-
-// Screensaver Ads (Client)
-Restaurant.hasMany(ClientAd, { foreignKey: 'restaurantId', onDelete: 'CASCADE' });
-ClientAd.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
-
-
-// --- 2.7. Ad Network (Publicidade Global) ---
+// --- 2.9. Marketing & Ads ---
 Advertiser.hasMany(Campaign, { foreignKey: 'advertiserId', onDelete: 'CASCADE' });
 Campaign.belongsTo(Advertiser, { foreignKey: 'advertiserId' });
 
 Campaign.hasMany(AdCreative, { as: 'creatives', foreignKey: 'campaignId', onDelete: 'CASCADE' });
 AdCreative.belongsTo(Campaign, { foreignKey: 'campaignId' });
-
-// Segmentação: Campanhas <-> Regiões (Muitos-para-Muitos)
-Campaign.belongsToMany(Region, { through: 'CampaignRegions' });
-Region.belongsToMany(Campaign, { through: 'CampaignRegions' });
-
-// Auditoria de Impressões (Big Data)
-Campaign.hasMany(AdImpression, { foreignKey: 'campaignId' });
-AdImpression.belongsTo(Campaign, { foreignKey: 'campaignId' });
-
-AdCreative.hasMany(AdImpression, { foreignKey: 'creativeId' });
-AdImpression.belongsTo(AdCreative, { foreignKey: 'creativeId' });
-
-Restaurant.hasMany(AdImpression, { foreignKey: 'restaurantId' });
-AdImpression.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
-
-
-// --- 2.8. Financeiro & Contabilidade ---
-// Faturas podem ser de Restaurantes (SaaS) ou Anunciantes (Ads)
-Restaurant.hasMany(Invoice, { foreignKey: 'restaurantId' });
-Invoice.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
-
-Advertiser.hasMany(Invoice, { foreignKey: 'advertiserId' });
-Invoice.belongsTo(Advertiser, { foreignKey: 'advertiserId' });
-
-// Livro Razão ligado à Fatura
-Invoice.hasMany(LedgerEntry, { foreignKey: 'invoiceId' });
-LedgerEntry.belongsTo(Invoice, { foreignKey: 'invoiceId' });
-
-
-// --- 2.9. Auditoria & Segurança ---
-User.hasMany(AuditLog, { foreignKey: 'userId' });
-AuditLog.belongsTo(User, { foreignKey: 'userId' });
 
 
 // ============================================================
@@ -232,21 +181,19 @@ AuditLog.belongsTo(User, { foreignKey: 'userId' });
 
 module.exports = {
   sequelize,
-  // Core System
   User,
+  Role,
+  Permission,
   SystemSetting,
   AuditLog,
-
-  // SaaS Business
+  EmailTemplate,
   Plan,
   Region,
   ExchangeRate,
-
-  // Financeiro
   Invoice,
   LedgerEntry,
-
-  // Tenant Models
+  CashReport,
+  Reservation,
   Restaurant,
   RestaurantConfig,
   RestaurantDocument,
@@ -257,25 +204,19 @@ module.exports = {
   TableDevice,
   Notification,
   Review,
-
-  // Menu Models
+  Ticket,
+  TicketMessage,
   Category,
   Product,
   ProductVariant,
   ModifierGroup,
   Modifier,
-
-  // Order Models
+  Offer,
   Order,
   OrderItem,
-
-  // Marketing Interno
-  Banner,
   Banner,
   Promotion,
   ClientAd,
-
-  // Ad Network
   Advertiser,
   Campaign,
   AdCreative,

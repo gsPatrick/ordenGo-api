@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { promisify } = require('util');
-const { User, Restaurant } = require('../models');
+const { User, Restaurant, Role, Permission } = require('../models');
 const AppError = require('../utils/AppError');
 const catchAsync = require('../utils/catchAsync');
 
@@ -31,12 +31,17 @@ exports.protect = catchAsync(async (req, res, next) => {
     process.env.JWT_SECRET
   );
 
-  // 3. Verificar se o usuário existe
+  // 3. Verificar se o usuário existe (Com Role e Permissões)
   const currentUser = await User.findByPk(decoded.id, {
     include: [
       {
         model: Restaurant,
         attributes: ['id', 'isActive', 'name']
+      },
+      {
+        model: Role,
+        as: 'userRole',
+        include: [{ model: Permission }]
       }
     ]
   });
@@ -48,52 +53,42 @@ exports.protect = catchAsync(async (req, res, next) => {
   }
 
   // 4. Verificações específicas
-
-  /**
-   * A. Usuários comuns (garçom/gerente/etc) têm restaurantId != null.
-   * Superadmin e equipe interna têm restaurantId = null → IGNORAR validação de restaurante.
-   */
   const isSuperAdmin = currentUser.role === 'superadmin';
 
   if (!isSuperAdmin && currentUser.restaurantId) {
-    // Se for usuário vinculado a restaurante, validar se o restaurante está ativo.
     if (currentUser.Restaurant && !currentUser.Restaurant.isActive) {
       return next(
-        new AppError(
-          'A conta deste restaurante foi suspensa. Contate o suporte.',
-          403
-        )
+        new AppError('A conta deste restaurante foi suspensa. Contate o suporte.', 403)
       );
     }
   }
 
   // 5. Injetar dados na requisição
+  req.permissions = currentUser.userRole?.Permissions?.map(p => p.slug) || [];
   req.user = currentUser;
-
-  /**
-   * Adicionar o restaurantId:
-   * - Superadmin → null (correto)
-   * - Usuário comum → id do restaurante
-   */
   req.restaurantId = isSuperAdmin ? null : currentUser.restaurantId;
 
   next();
 });
 
 /**
- * Middleware para restringir acesso por Cargo (Role).
- * Exemplo: restrictTo('superadmin', 'admin_finance')
+ * Middleware para restringir acesso (RBAC Híbrido).
+ * @param  {...string} allowed - Roles estáticas, Nomes de Role ou Slugs de Permissão.
  */
-exports.restrictTo = (...roles) => {
+exports.restrictTo = (...allowed) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return next(
-        new AppError(
-          'Você não tem permissão para realizar esta ação.',
-          403
-        )
-      );
-    }
-    next();
+    // 1. Verifica Role Estática (User.role)
+    if (allowed.includes(req.user.role)) return next();
+
+    // 2. Verifica Role Dinâmica (User.userRole.name)
+    if (req.user.userRole && allowed.includes(req.user.userRole.name)) return next();
+
+    // 3. Verifica Permissão Específica (req.permissions)
+    const hasPermission = allowed.some(p => req.permissions.includes(p));
+    if (hasPermission) return next();
+
+    return next(
+      new AppError('Você não tem permissão para realizar esta ação.', 403)
+    );
   };
 };

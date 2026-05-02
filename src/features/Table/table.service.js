@@ -6,7 +6,11 @@ const AppError = require('../../utils/AppError');
  * Cria uma nova mesa e gera seu Token QR Code único
  */
 exports.createTable = async (restaurantId, data) => {
-  const { number } = data; // Ex: "01", "10A", "Terraço 1"
+  const number = data.number || data.name; // Suporte a ambos os campos do frontend
+
+  if (!number) {
+    throw new AppError('O número ou nome da mesa é obrigatório.', 400);
+  }
 
   // 1. Verificar se já existe mesa com esse número/nome neste restaurante
   const exists = await Table.findOne({ where: { restaurantId, number } });
@@ -15,16 +19,50 @@ exports.createTable = async (restaurantId, data) => {
   }
 
   // 2. Gerar um Token Único para o QR Code
-  // Este token fará parte da URL: https://app.ordengo.com/t/{qrCodeToken}
   const token = crypto.randomBytes(8).toString('hex');
+  const shortPin = Math.floor(100000 + Math.random() * 900000).toString(); // 6 dígitos
 
   const table = await Table.create({
     restaurantId,
     number,
     qrCodeToken: token,
+    shortPin: shortPin,
     status: 'free'
   });
 
+  return table;
+};
+
+/**
+ * Valida um PIN curto para reconexão do Tablet
+ */
+exports.validateShortPIN = async (restaurantId, pin) => {
+  const table = await Table.findOne({
+    where: { restaurantId, shortPin: pin },
+    include: [
+      {
+        model: Restaurant,
+        attributes: ['id', 'name', 'currency'],
+        include: [{ model: RestaurantConfig, as: 'config' }]
+      }
+    ]
+  });
+
+  if (!table) throw new AppError('PIN inválido.', 401);
+  return table;
+};
+
+/**
+ * Regenera o Token do QR Code (Segurança ao limpar mesa)
+ */
+exports.regenerateTableToken = async (restaurantId, tableId) => {
+  const table = await Table.findOne({ where: { id: tableId, restaurantId } });
+  if (!table) throw new AppError('Mesa não encontrada.', 404);
+
+  const newToken = crypto.randomBytes(8).toString('hex');
+  table.qrCodeToken = newToken;
+  await table.save();
+  
   return table;
 };
 
@@ -140,6 +178,36 @@ exports.connectDeviceToTable = async (token, deviceInfo) => {
   await table.save();
 
   return table;
+};
+
+exports.transferTable = async (restaurantId, sourceUuid, targetTableId) => {
+  const sourceTable = await Table.findOne({ where: { uuid: sourceUuid, restaurantId } });
+  const targetTable = await Table.findOne({ where: { id: targetTableId, restaurantId } });
+
+  if (!sourceTable || !targetTable) throw new AppError('Mesa não encontrada.', 404);
+  if (targetTable.status !== 'free') throw new AppError('A mesa de destino não está livre.', 400);
+  if (!sourceTable.currentSessionId) throw new AppError('A mesa de origem não tem uma sessão ativa.', 400);
+
+  const sessionId = sourceTable.currentSessionId;
+
+  // 1. Atualizar Sessão para apontar para a nova mesa
+  const session = await TableSession.findByPk(sessionId);
+  if (session) {
+    session.tableId = targetTable.uuid;
+    await session.save();
+  }
+
+  // 2. Atualizar Mesa de Destino
+  targetTable.currentSessionId = sessionId;
+  targetTable.status = 'occupied';
+  await targetTable.save();
+
+  // 3. Limpar Mesa de Origem
+  sourceTable.currentSessionId = null;
+  sourceTable.status = 'free';
+  await sourceTable.save();
+
+  return { sourceTable, targetTable };
 };
 
 /**

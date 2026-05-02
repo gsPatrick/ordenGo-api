@@ -32,8 +32,8 @@ exports.validateSession = catchAsync(async (req, res, next) => {
 });
 
 exports.closeSession = catchAsync(async (req, res, next) => {
-  const { paymentMethod } = req.body;
-  const session = await orderService.closeSession(req.restaurantId, req.params.id, paymentMethod);
+  const { payments } = req.body;
+  const session = await orderService.closeSession(req.restaurantId, req.params.id, payments);
 
   // --- CORREÇÃO 1: Limpar TODAS as notificações pendentes desta mesa ---
   // Isso impede que sobrem notificações antigas após fechar a conta

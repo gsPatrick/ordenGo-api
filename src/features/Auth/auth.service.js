@@ -74,7 +74,7 @@ exports.loginWaiterWithPin = async (pin, restaurantIdentifier) => {
     where: {
       pin,
       restaurantId: targetRestaurantId,
-      role: 'waiter'
+      role: ['waiter', 'manager', 'cook']
     },
     include: [{
       model: Restaurant,

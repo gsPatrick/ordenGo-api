@@ -8,6 +8,9 @@ const campaignRoutes = require('../AdNetwork/campaign.routes');
 const financeRoutes = require('../Finance/finance.routes');
 const analyticsRoutes = require('../Analytics/analytics.routes');
 const settingsRoutes = require('../Settings/settings.routes');
+const ticketRoutes = require('../Support/ticket.routes');
+const emailTemplateRoutes = require('../Marketing/emailTemplate.routes');
+const roleRoutes = require('../Platform/role.routes');
 
 const { protect, restrictTo } = require('../../middlewares/authMiddleware');
 const upload = require('../../utils/upload');
@@ -28,6 +31,7 @@ router.get('/tenants/:id', superAdminController.getRestaurant);
 router.put('/tenants/:id', superAdminController.updateRestaurant);
 router.delete('/tenants/:id', superAdminController.deleteRestaurant);
 router.patch('/tenants/:id/toggle-status', superAdminController.toggleStatus);
+router.patch('/tenants/:id/update-password', superAdminController.updatePassword);
 
 // Documentos
 router.get('/tenants/:id/documents', superAdminController.listDocuments);
@@ -56,6 +60,15 @@ router.use('/analytics', analyticsRoutes);
 
 // 6. Configurações e Auditoria
 router.use('/settings', settingsRoutes);
+
+// 6.1 Tickets de Suporte
+router.use('/tickets', ticketRoutes);
+
+// 6.2 Email Marketing & Templates
+router.use('/email-templates', emailTemplateRoutes);
+
+// 6.3 RBAC (Roles & Permissões)
+router.use('/roles', roleRoutes);
 
 // 7. Gestão de Planos (SaaS Tiers)
 router.use('/plans', planRoutes);

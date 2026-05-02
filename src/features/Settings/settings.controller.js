@@ -49,3 +49,14 @@ exports.updateGlobalIntegrations = catchAsync(async (req, res, next) => {
     data: updatedSettings
   });
 });
+exports.getSettings = catchAsync(async (req, res, next) => {
+  const { group } = req.query;
+  const settings = await systemService.getSettingsByGroup(group || 'general');
+  res.status(200).json({ status: 'success', data: { settings } });
+});
+
+exports.updateSettingsBatch = catchAsync(async (req, res, next) => {
+  const { settings } = req.body;
+  await systemService.updateSettingsBatch(settings);
+  res.status(200).json({ status: 'success', message: 'Configurações atualizadas em lote.' });
+});

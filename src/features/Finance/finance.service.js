@@ -4,7 +4,10 @@ const {
   Restaurant, 
   Plan, 
   Region, 
-  Advertiser, // <--- ADICIONADO AQUI
+  Advertiser, 
+  CashReport,
+  SessionPayment,
+  TableSession,
   sequelize 
 } = require('../../models');
 const AppError = require('../../utils/AppError');
@@ -194,4 +197,110 @@ exports.getLedgerBalance = async () => {
     totalExpenses: totalDebit,
     balance: totalCredit - totalDebit
   };
+};
+
+// ============================================================
+// GESTÃO DE CAIXA (RESTAURANTE / APP CAJA)
+// ============================================================
+
+/**
+ * Obtém o caixa aberto do dia para o restaurante
+ */
+exports.getActiveCashSession = async (restaurantId) => {
+  return await CashReport.findOne({
+    where: { restaurantId, status: 'open' }
+  });
+};
+
+/**
+ * Abre uma nova sessão de caixa
+ */
+exports.openCashSession = async (restaurantId, openingAmount) => {
+  const active = await exports.getActiveCashSession(restaurantId);
+  if (active) throw new AppError('Ya existe una sesión de caja abierta.', 400);
+
+  return await CashReport.create({
+    restaurantId,
+    openingTime: new Date(),
+    openingAmount: Number(openingAmount || 0),
+    status: 'open'
+  });
+};
+
+/**
+ * Registra uma Sangria (Retirada de dinheiro do caixa)
+ */
+exports.addWithdrawal = async (restaurantId, amount, note = '') => {
+  const active = await exports.getActiveCashSession(restaurantId);
+  if (!active) throw new AppError('No hay una sesión de caja abierta.', 400);
+
+  active.withdrawals = Number(active.withdrawals) + Number(amount);
+  // Opcional: Registrar em logs de auditoria aqui
+  await active.save();
+  return active;
+};
+
+/**
+ * Fecha a sessão de caixa (Ticket Z) e calcula totais reais
+ */
+exports.closeCashSession = async (restaurantId) => {
+  const active = await exports.getActiveCashSession(restaurantId);
+  if (!active) throw new AppError('No hay sesión de caja activa.', 400);
+
+  // Buscar todos os pagamentos realizados enquanto o caixa estava aberto
+  const payments = await SessionPayment.findAll({
+    where: { cashReportId: active.id }
+  });
+
+  let totalCash = 0;
+  let totalCard = 0;
+  let totalPix = 0;
+  let totalSales = 0;
+
+  payments.forEach(p => {
+    const val = Number(p.amount);
+    totalSales += val;
+    if (p.method === 'cash') totalCash += val;
+    if (['card', 'debit'].includes(p.method)) totalCard += val;
+    if (p.method === 'pix') totalPix += val;
+  });
+
+  active.totalCash = totalCash;
+  active.totalCard = totalCard;
+  active.totalSales = totalSales;
+  active.closingAmount = (Number(active.openingAmount) + totalCash) - Number(active.withdrawals);
+  active.closingTime = new Date();
+  active.status = 'closed';
+
+  await active.save();
+  return active;
+};
+
+/**
+ * Lista Histórico de Fechamentos de Caixa
+ */
+exports.getCashReports = async (restaurantId, filters = {}) => {
+  const where = { restaurantId };
+  
+  if (filters.status) where.status = filters.status;
+  if (filters.startDate && filters.endDate) {
+    where.openingTime = { [Op.between]: [new Date(filters.startDate), new Date(filters.endDate)] };
+  }
+
+  return await CashReport.findAll({
+    where,
+    order: [['openingTime', 'DESC']]
+  });
+};
+
+/**
+ * Detalhes de um fechamento específico
+ */
+exports.getCashReportById = async (restaurantId, id) => {
+  const report = await CashReport.findOne({ 
+    where: { id, restaurantId },
+    include: [{ model: SessionPayment }] 
+  });
+  if (!report) throw new AppError('Relatório de caixa não encontrado.', 404);
+  return report;
 };

@@ -1,3 +1,4 @@
+const sizeOf = require('image-size');
 const { Campaign, AdCreative, Region, Advertiser, sequelize } = require('../../models');
 const AppError = require('../../utils/AppError');
 const { Op } = require('sequelize');
@@ -49,6 +50,7 @@ exports.createCampaign = async (data) => {
     throw error;
   }
 };
+const sizeOf = require('image-size');
 
 /**
  * Adiciona um Criativo (Banner/Vídeo) a uma campanha existente
@@ -57,8 +59,26 @@ exports.addCreativeToCampaign = async (campaignId, fileData, linkUrl) => {
   const campaign = await Campaign.findByPk(campaignId);
   if (!campaign) throw new AppError('Campanha não encontrada.', 404);
 
-  // Define tipo baseado na extensão ou mimetype
+  // 1. Validação de Aspect Ratio 16:9 para Imagens
   const type = fileData.mimetype.startsWith('video') ? 'video' : 'image';
+  
+  if (type === 'image') {
+    try {
+      const dimensions = sizeOf(fileData.path);
+      const ratio = dimensions.width / dimensions.height;
+      const targetRatio = 9 / 16; // MODO RETRATO (Portrait)
+      const tolerance = 0.05; // 5% de tolerância
+
+      if (Math.abs(ratio - targetRatio) > tolerance) {
+        throw new AppError(`A imagem deve ter proporção 9:16 (Modo Retrato). Proporção enviada: ${ratio.toFixed(2)}`, 400);
+      }
+    } catch (err) {
+      if (err.statusCode) throw err;
+      // Se falhar ao ler dimensões, ignoramos ou lançamos erro
+      console.error('Erro ao validar dimensões da imagem:', err);
+    }
+  }
+
   const mediaUrl = `/uploads/${fileData.filename}`;
 
   const creative = await AdCreative.create({
@@ -67,9 +87,6 @@ exports.addCreativeToCampaign = async (campaignId, fileData, linkUrl) => {
     mediaUrl,
     linkUrl: linkUrl || null
   });
-
-  // Se a campanha estava em 'draft', podemos passar para 'active' automaticamente ou manter manual
-  // Por segurança, vamos manter manual ou deixar o admin decidir.
   
   return creative;
 };

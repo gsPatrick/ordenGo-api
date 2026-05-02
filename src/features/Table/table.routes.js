@@ -12,6 +12,9 @@ const router = express.Router();
 // [ANTIGO - LEGADO] Inicialização via GET no Token
 router.get('/access/:token', tableController.initializeTablet);
 
+// [NOVO] Handshake via PIN (6 dígitos)
+router.get('/access/pin/:pin', tableController.validatePin);
+
 // [NOVO] Vinculação de Dispositivo via Código Manual + UUID
 // O tablet envia { "tableCode": "...", "deviceUuid": "..." }
 // É PÚBLICA pois o tablet ainda não tem login de usuário, ele se autentica pelo Código da Mesa
@@ -30,6 +33,9 @@ router.get('/', tableController.getAll);
 
 // Atualizar Status da Mesa (Livre/Ocupada/Limpeza)
 router.patch('/:id/status', restrictTo('manager', 'superadmin', 'waiter'), tableController.updateStatus);
+
+// Transferir Mesa (Mudar de Mesa)
+router.post('/:uuid/transfer', restrictTo('manager', 'superadmin', 'waiter'), tableController.transferTable);
 
 
 // --- ROTAS DE GESTÃO DE DISPOSITIVOS (Tablets) ---

@@ -15,9 +15,9 @@ const Product = sequelize.define('Product', {
     type: DataTypes.UUID,
     allowNull: false,
   },
-  // i18n
+  // i18n support
   name: {
-    type: DataTypes.JSONB, // { pt: "X-Bacon", en: "Bacon Burger" }
+    type: DataTypes.JSONB, // { pt: "Pizza Pepperoni", es: "Pizza Pepperoni" }
     allowNull: false,
   },
   description: {
@@ -32,30 +32,36 @@ const Product = sequelize.define('Product', {
     type: DataTypes.STRING,
   },
   gallery: {
-    type: DataTypes.JSONB, // Array de URLs adicionais
+    type: DataTypes.JSONB, // Array of additional URLs
     defaultValue: []
   },
-  // Flags de Marketing
+  
+  // Gastronomy Logic
+  allergens: {
+    type: DataTypes.ARRAY(DataTypes.STRING), // ["gluten", "dairy", "nuts"]
+    defaultValue: []
+  },
+  
+  pizzaConfig: {
+    type: DataTypes.JSONB, // { isPizza: true, halfHalfPriceLogic: 'highest' | 'average' }
+    defaultValue: { isPizza: false, halfHalfPriceLogic: 'highest' }
+  },
+
+  // Marketing & UI
   isOffer: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
-  isHighlight: {
+  isHighlight: { // Featured on special grid
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
-  // Controle
   isAvailable: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
-  details: {
-    type: DataTypes.JSONB, // { calories: 300, allergens: ["gluten"] }
-  },
-  hasVariants: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
-  },
+  
+  // Ordering for Tablet
   order: {
     type: DataTypes.INTEGER,
     defaultValue: 0,

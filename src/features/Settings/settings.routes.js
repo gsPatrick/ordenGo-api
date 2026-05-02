@@ -21,4 +21,8 @@ router.get('/audit-logs', settingsController.listLogs);
 router.get('/integrations', settingsController.getGlobalIntegrations);
 router.patch('/integrations', logAction('UPDATE_GLOBAL_INTEGRATIONS'), settingsController.updateGlobalIntegrations);
 
+// 4. Configurações Genéricas
+router.get('/', settingsController.getSettings);
+router.post('/batch', logAction('UPDATE_SETTINGS_BATCH'), settingsController.updateSettingsBatch);
+
 module.exports = router;

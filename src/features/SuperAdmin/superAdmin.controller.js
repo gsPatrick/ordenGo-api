@@ -111,6 +111,18 @@ exports.deleteRestaurant = catchAsync(async (req, res, next) => {
   res.status(204).json({ status: 'success', data: null });
 });
 
+exports.updatePassword = catchAsync(async (req, res, next) => {
+  const { password } = req.body;
+  if (!password) return next(new AppError('Password is required', 400));
+  
+  await superAdminService.updateManagerPassword(req.params.id, password);
+  
+  res.status(200).json({
+    status: 'success',
+    message: '¡Contraseña actualizada con éxito!'
+  });
+});
+
 exports.listDocuments = catchAsync(async (req, res, next) => {
   const documents = await superAdminService.getDocuments(req.params.id);
   res.status(200).json({ status: 'success', results: documents.length, data: { documents } });

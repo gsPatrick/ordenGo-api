@@ -22,6 +22,10 @@ const Restaurant = sequelize.define('Restaurant', {
   billingAddress: {
     type: DataTypes.TEXT,
   },
+  fullAddress: { // NOVO: Endereço Completo do Cliente
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
   contactPerson: {
     type: DataTypes.STRING,
   },

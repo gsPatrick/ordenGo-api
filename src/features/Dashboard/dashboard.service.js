@@ -192,33 +192,39 @@ exports.getSaaSStats = async () => {
   // A. Métricas de Crescimento
   const totalRestaurants = await Restaurant.count();
   const activeRestaurants = await Restaurant.count({ where: { isActive: true } });
+  const suspendedRestaurants = await Restaurant.count({ where: { isActive: false } });
 
-  // B. Distribuição de Planos (CORRIGIDO: Usa a tabela Plan)
-  const planDistribution = await Restaurant.findAll({
-    attributes: [
-      [sequelize.fn('COUNT', sequelize.col('Restaurant.id')), 'count']
-    ],
+  // B. Cálculo de MRR (Monthly Recurring Revenue)
+  // Buscamos todos os restaurantes ativos e seus respectivos planos
+  const activeSubscriptions = await Restaurant.findAll({
+    where: { isActive: true },
     include: [{
       model: Plan,
-      attributes: ['name']
-    }],
-    group: ['Plan.id', 'Plan.name'],
-    raw: true
+      attributes: ['name', 'priceMonthly', 'priceYearly']
+    }]
   });
 
-  // Formata o resultado para { 'Basic': 10, 'Premium': 5 }
-  const formattedPlans = {};
-  planDistribution.forEach(item => {
-    const planName = item['Plan.name'] || 'Sem Plano';
-    formattedPlans[planName] = Number(item.count);
+  let mrr = 0;
+  const planDistribution = {};
+
+  activeSubscriptions.forEach(res => {
+    const plan = res.Plan;
+    if (plan) {
+      // Cálculo: Mensal + (Anual / 12) - Assumindo que o restaurante está em um dos dois
+      // Se houver ambos, priorizamos mensal para o cálculo de fluxo recorrente
+      const monthlyContribution = Number(plan.priceMonthly) || (Number(plan.priceYearly) / 12) || 0;
+      mrr += monthlyContribution;
+
+      planDistribution[plan.name] = (planDistribution[plan.name] || 0) + 1;
+    }
   });
 
-  // C. Volume Transacionado Global (GMV)
+  // C. Volume Transacionado Global (GMV) - Apenas pedidos não cancelados
   const globalGMV = await Order.sum('total', {
-    where: { status: { [Op.not]: 'cancelled' } }
+    where: { status: { [Op.not]: ['cancelled', 'pending'] } }
   });
 
-  // D. Novos restaurantes nos últimos 30 dias
+  // D. Novos restaurantes nos últimos 30 dias (Growth)
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
@@ -228,16 +234,33 @@ exports.getSaaSStats = async () => {
     }
   });
 
+  // E. Tickets de Suporte (Help Desk Load)
+  const ticketsByStatus = await Ticket.findAll({
+    attributes: [
+      'status',
+      [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+    ],
+    group: ['status'],
+    raw: true
+  });
+
+  const formattedTickets = { open: 0, in_progress: 0, closed: 0 };
+  ticketsByStatus.forEach(t => {
+    formattedTickets[t.status] = Number(t.count);
+  });
+
   return {
     tenants: {
       total: totalRestaurants,
       active: activeRestaurants,
-      inactive: totalRestaurants - activeRestaurants,
+      suspended: suspendedRestaurants,
       newLast30Days: newTenantsLastMonth
     },
     financial: {
-      globalGMV: globalGMV || 0
+      globalGMV: globalGMV || 0,
+      mrr: Math.round(mrr * 100) / 100 // Arredonda para 2 casas
     },
-    plans: formattedPlans
+    tickets: formattedTickets,
+    plans: planDistribution
   };
 };

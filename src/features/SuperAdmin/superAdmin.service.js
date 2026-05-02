@@ -26,7 +26,7 @@ const generateAccessCode = () => {
  */
 exports.createTenant = async (data) => {
   const {
-    restaurantName, slug, taxId, billingAddress, contactPerson,
+    restaurantName, slug, taxId, billingAddress, fullAddress, contactPerson,
     timezone, country, currency, planId, regionId,
     managerName, managerEmail, managerPassword,
     // Configurações de Screensaver (Opcionais)
@@ -59,6 +59,7 @@ exports.createTenant = async (data) => {
       accessCode,
       taxId,
       billingAddress,
+      fullAddress,
       contactPerson: contactPerson || managerName,
       timezone: timezone || 'Europe/Madrid',
       country: country || 'ES',
@@ -244,4 +245,15 @@ exports.deleteNote = async (restaurantId, noteId) => {
   const note = await RestaurantNote.findOne({ where: { id: noteId, restaurantId } });
   if (!note) throw new AppError('Nota no encontrada.', 404);
   await note.destroy();
+};
+
+exports.updateManagerPassword = async (restaurantId, newPassword) => {
+  const manager = await User.findOne({ where: { restaurantId, role: 'manager' } });
+  if (!manager) throw new AppError('Este restaurante no tiene un gerente configurado.', 404);
+
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+  manager.password = hashedPassword;
+  await manager.save();
+
+  return true;
 };

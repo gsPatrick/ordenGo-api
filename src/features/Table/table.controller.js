@@ -118,6 +118,39 @@ exports.initializeTablet = catchAsync(async (req, res, next) => {
     }
   });
 });
+// ROTA PÚBLICA: Validar via PIN Curto
+exports.validatePin = catchAsync(async (req, res, next) => {
+  const { pin } = req.params;
+  const { restaurantId } = req.query; // Precisa do restaurantId para ser único
+
+  const tableData = await tableService.validateShortPIN(restaurantId, pin);
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      table: {
+        id: tableData.id,
+        uuid: tableData.uuid,
+        number: tableData.number,
+        qrCodeToken: tableData.qrCodeToken // Retorna o token para o tablet salvar
+      },
+      restaurant: tableData.Restaurant
+    }
+  });
+});
+
+// ROTA PROTEGIDA: Transferir Mesa
+exports.transferTable = catchAsync(async (req, res, next) => {
+  const { uuid } = req.params;
+  const { targetTableId } = req.body;
+
+  await tableService.transferTable(req.restaurantId, uuid, targetTableId);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Mesa transferida com sucesso.'
+  });
+});
 
 // ROTA PROTEGIDA: Desconectar Dispositivo
 exports.disconnectDevice = catchAsync(async (req, res, next) => {

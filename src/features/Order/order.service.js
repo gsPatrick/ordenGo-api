@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const {
-  Order, OrderItem, TableSession, Table, Product, ProductVariant, User, sequelize
+  Order, OrderItem, TableSession, Table, Product, ProductVariant, User, 
+  SessionPayment, CashReport, sequelize
 } = require('../../models');
 const AppError = require('../../utils/AppError');
 
@@ -87,10 +88,15 @@ exports.validateSessionToken = async (token) => {
 
 /**
  * Fecha a sessão (Conta paga)
+ * NOVO: Aceita 'payments' como um array de { method, amount } para pagamento fracionado
  */
-exports.closeSession = async (restaurantId, sessionId, paymentMethod) => {
+exports.closeSession = async (restaurantId, sessionId, payments) => {
   const session = await TableSession.findOne({ where: { id: sessionId, restaurantId } });
   if (!session) throw new AppError('Sessão não encontrada', 404);
+
+  // 1. Validar se existe caixa aberto para receber esse pagamento
+  const activeCash = await CashReport.findOne({ where: { restaurantId, status: 'open' } });
+  if (!activeCash) throw new AppError('No hay una sesión de caja abierta. Por favor, abra el turno primero.', 400);
 
   // Busca a mesa usando o UUID salvo na sessão
   const table = await Table.findOne({ where: { uuid: session.tableId } });
@@ -99,12 +105,42 @@ exports.closeSession = async (restaurantId, sessionId, paymentMethod) => {
   try {
     session.status = 'closed';
     session.closedAt = new Date();
-    session.paymentMethod = paymentMethod;
+    
+    // Salva o método principal (ou o primeiro) no campo legado para compatibilidade rápida
+    if (payments && Array.isArray(payments) && payments.length > 0) {
+      session.paymentMethod = payments[0].method;
+      
+      // Criar registros detalhados de pagamento
+      for (const p of payments) {
+        await SessionPayment.create({
+          restaurantId,
+          tableSessionId: session.id,
+          cashReportId: activeCash.id,
+          method: p.method,
+          amount: p.amount
+        }, { transaction });
+      }
+    } else if (typeof payments === 'string') {
+       // Fallback para caso venha apenas uma string do legado
+       session.paymentMethod = payments;
+       await SessionPayment.create({
+          restaurantId,
+          tableSessionId: session.id,
+          cashReportId: activeCash.id,
+          method: payments,
+          amount: session.totalAmount
+        }, { transaction });
+    }
+    
     await session.save({ transaction });
 
     if (table) {
       table.status = 'free';
       table.currentSessionId = null;
+
+      // Segurança: Rotacionar o Token do QR Code para que o anterior expire
+      const newToken = crypto.randomBytes(8).toString('hex');
+      table.qrCodeToken = newToken;
 
       // Cálculo de tempo decorrido em segundos (Telemetria)
       const startTime = new Date(session.openedAt).getTime();

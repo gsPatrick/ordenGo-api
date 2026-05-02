@@ -21,9 +21,17 @@ const Table = sequelize.define('Table', {
     type: DataTypes.STRING, // String para permitir "10A", "10B"
     allowNull: false,
   },
+  type: {
+    type: DataTypes.ENUM('table', 'bar'),
+    defaultValue: 'table',
+  },
   qrCodeToken: { // Token único para gerar a URL da mesa
     type: DataTypes.STRING,
     unique: true,
+  },
+  shortPin: { // PIN curto (6 dígitos) para reconexão simplificada
+    type: DataTypes.STRING,
+    allowNull: true,
   },
   status: { // Status visual instantâneo
     type: DataTypes.ENUM('free', 'occupied', 'reserved', 'calling', 'closing'),
