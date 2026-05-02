@@ -4,11 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node scripts/migrate_v2.js && node scripts/migrate_v3_screensaver.js && node scripts/migrate_v4_product_gallery.js && node scripts/migrate_v5_rbac.js && node src/app.js",
-    "dev": "node scripts/migrate_v2.js && node scripts/migrate_v3_screensaver.js && node scripts/migrate_v4_product_gallery.js && node scripts/migrate_v5_rbac.js && nodemon src/app.js",
-    "migrate": "node scripts/migrate.js && node scripts/migrate_v2.js && node scripts/migrate_v3_screensaver.js && node scripts/migrate_v4_product_gallery.js && node scripts/migrate_v5_rbac.js",
-    "migrate:v4": "node scripts/migrate_v4_product_gallery.js",
-    "migrate:v5": "node scripts/migrate_v5_rbac.js"
+    "start": "node scripts/master_migration.js && node src/app.js",
+    "dev": "node scripts/master_migration.js && nodemon src/app.js",
+    "migrate": "node scripts/master_migration.js",
+    "migrate:full": "node scripts/master_migration.js"
   },
   "keywords": [],
   "author": "",
