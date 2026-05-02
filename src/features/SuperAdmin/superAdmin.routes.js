@@ -59,6 +59,7 @@ router.use('/finance', financeRoutes);
 router.use('/analytics', analyticsRoutes);
 
 // 6. Configurações e Auditoria
+router.use('/audit-logs', settingsRoutes); // Alias para acesso direto
 router.use('/settings', settingsRoutes);
 
 // 6.1 Tickets de Suporte

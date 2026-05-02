@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const { 
-  Order, OrderItem, Product, Restaurant, User, Plan,Review, sequelize 
+  Order, OrderItem, Product, Restaurant, User, Plan, Review, Ticket, sequelize 
 } = require('../../models');
 
 // ============================================================

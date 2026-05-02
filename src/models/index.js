@@ -103,6 +103,9 @@ Reservation.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 Restaurant.hasMany(CashReport, { foreignKey: 'restaurantId' });
 CashReport.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
 
+Restaurant.hasMany(Invoice, { foreignKey: 'restaurantId' });
+Invoice.belongsTo(Restaurant, { foreignKey: 'restaurantId' });
+
 
 // --- 2.5. Mesas & Sessões ---
 Restaurant.hasMany(Table, { foreignKey: 'restaurantId' });
@@ -173,6 +176,9 @@ Campaign.belongsTo(Advertiser, { foreignKey: 'advertiserId' });
 
 Campaign.hasMany(AdCreative, { as: 'creatives', foreignKey: 'campaignId', onDelete: 'CASCADE' });
 AdCreative.belongsTo(Campaign, { foreignKey: 'campaignId' });
+
+Campaign.belongsToMany(Region, { through: 'CampaignRegions' });
+Region.belongsToMany(Campaign, { through: 'CampaignRegions' });
 
 
 // ============================================================
