@@ -28,6 +28,10 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING(4), 
     allowNull: true,
   },
+  phone: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   // MODIFICADO: Adicionadas roles da equipe interna
   role: {
     type: DataTypes.ENUM(
