@@ -6,11 +6,22 @@ const bcrypt = require('bcryptjs');
  * Cria um membro da equipe interna (Super Admin, Financeiro, Suporte)
  */
 exports.createInternalUser = async (data) => {
-  const { name, email, password, role } = data;
+  const { name, email, password, role: roleName } = data;
+  const { Role } = require('../../models');
 
-  // Validações
-  if (!['superadmin', 'admin_finance', 'admin_support', 'admin_sales'].includes(role)) {
-    throw new AppError('Role inválida para equipe interna.', 400);
+  // Buscar Role no Banco de Dados
+  let dbRole = await Role.findOne({ where: { name: roleName } });
+  
+  // Fallback para nomes de role antigos se não encontrar
+  if (!dbRole) {
+    // Se for 'superadmin', mapeamos para o role de sistema 'Super Admin'
+    if (roleName === 'superadmin') {
+      dbRole = await Role.findOne({ where: { name: 'Super Admin' } });
+    }
+  }
+
+  if (!dbRole && !['superadmin', 'admin_finance', 'admin_support'].includes(roleName)) {
+    throw new AppError('Role inválida ou não encontrada no sistema.', 400);
   }
 
   const exists = await User.findOne({ where: { email } });
@@ -22,8 +33,9 @@ exports.createInternalUser = async (data) => {
     name,
     email,
     password: hashedPassword,
-    role,
-    restaurantId: null // CRÍTICO: Isso define que ele é da equipe interna
+    role: dbRole ? (dbRole.name === 'Super Admin' ? 'superadmin' : dbRole.name.toLowerCase().replace(' ', '_')) : roleName,
+    roleId: dbRole ? dbRole.id : null,
+    restaurantId: null // Equipe interna
   });
 
   user.password = undefined;

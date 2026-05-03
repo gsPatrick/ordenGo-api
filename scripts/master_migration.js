@@ -121,6 +121,45 @@ async function runMigrations() {
         await RestaurantNote.sync({ alter: true });
         await sequelize.sync(); // Garante junções como RolePermissions
 
+        // ---------------------------------------------------------
+        // 6. Seeding de RBAC (Permissões e Roles)
+        // ---------------------------------------------------------
+        console.log('--- Fase 6 (Seeding RBAC) ---');
+        const permissions = [
+            { slug: 'view_dashboard', name: 'Ver Dashboard', group: 'Dashboard' },
+            { slug: 'view_tenants', name: 'Ver Clientes', group: 'Clientes' },
+            { slug: 'manage_tenants', name: 'Gerenciar Clientes', group: 'Clientes' },
+            { slug: 'view_ads', name: 'Ver Anúncios/Campanhas', group: 'Publicidade' },
+            { slug: 'manage_ads', name: 'Gerenciar Anúncios', group: 'Publicidade' },
+            { slug: 'view_finance', name: 'Ver Financeiro', group: 'Financeiro' },
+            { slug: 'manage_finance', name: 'Gerenciar Faturas/Pagamentos', group: 'Financeiro' },
+            { slug: 'manage_team', name: 'Gerenciar Equipe SaaS', group: 'Plataforma' },
+            { slug: 'manage_roles', name: 'Gerenciar Cargos e Permissões', group: 'Plataforma' },
+            { slug: 'manage_smtp', name: 'Configurar SMTP', group: 'Plataforma' },
+            { slug: 'manage_branding', name: 'Gerenciar Branding Global/App', group: 'Sistema' },
+            { slug: 'view_logs', name: 'Ver Logs do Sistema', group: 'Sistema' },
+            { slug: 'manage_settings', name: 'Configurações Globais', group: 'Sistema' },
+        ];
+
+        for (const p of permissions) {
+            await Permission.findOrCreate({ where: { slug: p.slug }, defaults: p });
+        }
+
+        const systemRoles = [
+            { name: 'Super Admin', description: 'Acesso total ao sistema', isSystem: true },
+            { name: 'Soporte Técnico', description: 'Acesso a clientes, anúncios e logs', isSystem: false },
+            { name: 'Financiero', description: 'Acesso exclusivo ao módulo financeiro e relatórios', isSystem: false },
+        ];
+
+        for (const r of systemRoles) {
+            const [role] = await Role.findOrCreate({ where: { name: r.name }, defaults: r });
+            if (r.name === 'Super Admin') {
+                const allPerms = await Permission.findAll();
+                await role.setPermissions(allPerms);
+            }
+        }
+        console.log('✅ RBAC Seeded.');
+
         console.log('✨ Master Migration concluída com sucesso.');
         process.exit(0);
     } catch (error) {
