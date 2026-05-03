@@ -126,33 +126,38 @@ async function runMigrations() {
         // ---------------------------------------------------------
         console.log('--- Fase 6 (Seeding RBAC) ---');
         const permissions = [
-            { slug: 'view_dashboard', name: 'Ver Dashboard', group: 'Dashboard' },
+            { slug: 'view_dashboard', name: 'Ver Panel de Control', group: 'Dashboard' },
             { slug: 'view_tenants', name: 'Ver Clientes', group: 'Clientes' },
-            { slug: 'manage_tenants', name: 'Gerenciar Clientes', group: 'Clientes' },
-            { slug: 'view_ads', name: 'Ver Anúncios/Campanhas', group: 'Publicidade' },
-            { slug: 'manage_ads', name: 'Gerenciar Anúncios', group: 'Publicidade' },
-            { slug: 'view_finance', name: 'Ver Financeiro', group: 'Financeiro' },
-            { slug: 'manage_finance', name: 'Gerenciar Faturas/Pagamentos', group: 'Financeiro' },
-            { slug: 'manage_team', name: 'Gerenciar Equipe SaaS', group: 'Plataforma' },
-            { slug: 'manage_roles', name: 'Gerenciar Cargos e Permissões', group: 'Plataforma' },
+            { slug: 'manage_tenants', name: 'Gestionar Clientes', group: 'Clientes' },
+            { slug: 'view_ads', name: 'Ver Anuncios/Campañas', group: 'Publicidad' },
+            { slug: 'manage_ads', name: 'Gestionar Anuncios', group: 'Publicidad' },
+            { slug: 'view_finance', name: 'Ver Financiero', group: 'Finanzas' },
+            { slug: 'manage_finance', name: 'Gestionar Facturas/Pagos', group: 'Finanzas' },
+            { slug: 'manage_team', name: 'Gestionar Equipo SaaS', group: 'Plataforma' },
+            { slug: 'manage_roles', name: 'Gestionar Cargos y Permisos', group: 'Plataforma' },
             { slug: 'manage_smtp', name: 'Configurar SMTP', group: 'Plataforma' },
-            { slug: 'manage_branding', name: 'Gerenciar Branding Global/App', group: 'Sistema' },
-            { slug: 'view_logs', name: 'Ver Logs do Sistema', group: 'Sistema' },
-            { slug: 'manage_settings', name: 'Configurações Globais', group: 'Sistema' },
+            { slug: 'manage_branding', name: 'Gestionar Branding Global/App', group: 'Sistema' },
+            { slug: 'view_logs', name: 'Ver Logs del Sistema', group: 'Sistema' },
+            { slug: 'manage_settings', name: 'Configuraciones Globales', group: 'Sistema' },
         ];
 
         for (const p of permissions) {
             await Permission.findOrCreate({ where: { slug: p.slug }, defaults: p });
+            // Atualizar nomes existentes para espanhol se necessário
+            await Permission.update({ name: p.name, group: p.group }, { where: { slug: p.slug } });
         }
 
         const systemRoles = [
-            { name: 'Super Admin', description: 'Acesso total ao sistema', isSystem: true },
-            { name: 'Soporte Técnico', description: 'Acesso a clientes, anúncios e logs', isSystem: false },
-            { name: 'Financiero', description: 'Acesso exclusivo ao módulo financeiro e relatórios', isSystem: false },
+            { name: 'Super Admin', description: 'Acceso total al sistema', isSystem: true },
+            { name: 'Soporte Técnico', description: 'Acceso a clientes, anuncios y logs', isSystem: false },
+            { name: 'Financiero', description: 'Acceso exclusivo al módulo financiero y reportes', isSystem: false },
         ];
 
         for (const r of systemRoles) {
             const [role] = await Role.findOrCreate({ where: { name: r.name }, defaults: r });
+            // Atualizar nomes existentes
+            await Role.update({ description: r.description }, { where: { name: r.name } });
+            
             if (r.name === 'Super Admin') {
                 const allPerms = await Permission.findAll();
                 await role.setPermissions(allPerms);
