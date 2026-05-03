@@ -38,6 +38,28 @@ exports.updateTicketStatus = async (id, status) => {
   return ticket;
 };
 
+exports.createTicket = async (data) => {
+  const { restaurantId, creatorId, subject, message, priority } = data;
+
+  const ticket = await Ticket.create({
+    restaurantId,
+    creatorId,
+    subject,
+    priority: priority || 'medium',
+    status: 'open'
+  });
+
+  // Cria a primeira mensagem
+  await TicketMessage.create({
+    ticketId: ticket.id,
+    senderId: creatorId,
+    content: message,
+    isAdminReply: false
+  });
+
+  return ticket;
+};
+
 exports.replyTicket = async (id, data, sender, isAdmin = true) => {
   const { content, attachments } = data;
   const ticket = await Ticket.findByPk(id);

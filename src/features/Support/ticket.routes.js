@@ -6,13 +6,13 @@ const upload = require('../../utils/upload');
 const router = express.Router();
 
 router.use(protect);
-router.use(restrictTo('superadmin', 'admin_support'));
 
-router.get('/', ticketController.getAllTickets);
-router.get('/:id', ticketController.getTicket);
-router.patch('/:id/status', ticketController.updateStatus);
+router.get('/', restrictTo('superadmin', 'admin_support', 'manager', 'admin'), ticketController.getAllTickets);
+router.get('/:id', restrictTo('superadmin', 'admin_support', 'manager', 'admin'), ticketController.getTicket);
+router.post('/', restrictTo('manager', 'admin'), ticketController.createTicket);
+router.patch('/:id/status', restrictTo('superadmin', 'admin_support'), ticketController.updateStatus);
 
 // Reply com suporte a múltiplos anexos
-router.post('/:id/reply', upload.array('attachments', 5), ticketController.reply);
+router.post('/:id/reply', restrictTo('superadmin', 'admin_support', 'manager', 'admin'), upload.array('attachments', 5), ticketController.reply);
 
 module.exports = router;

@@ -24,6 +24,9 @@ const tableRoutes = require('../features/Table/table.routes'); // Mesas e Dispos
 const orderRoutes = require('../features/Order/order.routes'); // Pedidos e Sessões
 const notificationRoutes = require('../features/Notification/notification.routes'); // Chamar Garçom
 const feedbackRoutes = require('../features/Feedback/feedback.routes'); // Avaliações
+const reservationRoutes = require('../features/Reservation/reservation.routes');
+const financeRoutes = require('../features/Finance/finance.routes');
+const ticketRoutes = require('../features/Support/ticket.routes');
 
 // ==============================================================================
 // 2. ROTA DE HEALTH CHECK (Monitoramento)
@@ -78,5 +81,18 @@ router.use('/feedback', feedbackRoutes);
 
 // 📊 Dashboard do Gerente (Métricas do Restaurante)
 router.use('/dashboard', dashboardRoutes);
+
+// 📅 Reservas
+router.use('/reservations', reservationRoutes);
+
+// 💰 Financeiro (Caja)
+router.use('/finance', financeRoutes);
+
+// 🎫 Suporte (Tickets)
+router.use('/support', ticketRoutes);
+
+// 🔑 Roles e Permissões (Híbrido)
+const roleRoutes = require('../features/Platform/role.routes');
+router.use('/roles', roleRoutes);
 
 module.exports = router;

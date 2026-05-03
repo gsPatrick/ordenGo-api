@@ -7,11 +7,11 @@ const router = express.Router();
 router.use(protect);
 router.use(restrictTo('superadmin'));
 
-router.get('/permissions', roleController.getAllPermissions);
+router.get('/permissions', restrictTo('superadmin', 'manager', 'admin'), roleController.getAllPermissions);
 
 router.route('/')
-  .get(roleController.getAllRoles)
-  .post(roleController.createRole);
+  .get(restrictTo('superadmin', 'manager', 'admin'), roleController.getAllRoles)
+  .post(restrictTo('superadmin'), roleController.createRole);
 
 router.route('/:id')
   .patch(roleController.updateRole);
