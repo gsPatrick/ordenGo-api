@@ -57,7 +57,7 @@ exports.generateSaaSInvoice = async (restaurantId, dueDate) => {
   const invoice = await Invoice.create({
     type: 'saas_subscription',
     restaurantId: restaurant.id,
-    amount: total, // Valor Final
+    total: total, // Valor Final
     subtotal: subtotal,
     taxName: taxName,
     taxRate: taxRate,
