@@ -41,8 +41,12 @@ router.get('/health', (req, res) => {
 // 3. DEFINIÇÃO DOS ENDPOINTS (Mounting)
 // ==============================================================================
 
-// 🔐 Autenticação (Login Admin, Garçom e Tablet)
+// 🔓 Autenticação (Login Admin, Garçom e Tablet)
 router.use('/auth', authRoutes);
+
+// 🎨 Branding Público (Cores e Logos para todos os sistemas)
+const publicBrandingRoutes = require('../features/Platform/publicBranding.routes');
+router.use('/public/branding', publicBrandingRoutes);
 
 // 👑 Super Admin (Painel do Dono do SaaS)
 // Engloba: /admin/tenants, /admin/plans, /admin/finance, /admin/ads, etc.

@@ -60,3 +60,10 @@ exports.updateSettingsBatch = catchAsync(async (req, res, next) => {
   await systemService.updateSettingsBatch(settings);
   res.status(200).json({ status: 'success', message: 'Configurações atualizadas em lote.' });
 });
+
+exports.uploadAsset = catchAsync(async (req, res, next) => {
+  const AppError = require('../../utils/AppError');
+  if (!req.file) throw new AppError('Nenhum arquivo enviado.', 400);
+  const url = `/uploads/${req.file.filename}`;
+  res.status(200).json({ status: 'success', data: { url } });
+});

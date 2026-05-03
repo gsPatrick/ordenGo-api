@@ -5,9 +5,14 @@ const { logAction } = require('../../middlewares/auditMiddleware');
 
 const router = express.Router();
 
+const upload = require('../../utils/upload');
+
 router.use(protect);
 // GARANTIA: Apenas superadmin e roles administrativas específicas
 router.use(restrictTo('superadmin', 'admin_support')); 
+
+// 0. Assets
+router.post('/upload', upload.single('file'), settingsController.uploadAsset);
 
 // 1. Equipe
 router.get('/team', settingsController.listTeam);
