@@ -180,6 +180,9 @@ AdCreative.belongsTo(Campaign, { foreignKey: 'campaignId' });
 Campaign.belongsToMany(Region, { through: 'CampaignRegions' });
 Region.belongsToMany(Campaign, { through: 'CampaignRegions' });
 
+Advertiser.hasMany(Invoice, { foreignKey: 'advertiserId' });
+Invoice.belongsTo(Advertiser, { foreignKey: 'advertiserId' });
+
 
 // ============================================================
 // 3. EXPORTAÇÃO
